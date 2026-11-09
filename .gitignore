@@ -1,0 +1,14 @@
+# Maven
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Saídas geradas pelo compilador ao rodar exemplos
+*.obj
+*.exe
