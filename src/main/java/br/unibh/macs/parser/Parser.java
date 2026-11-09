@@ -88,6 +88,7 @@ public final class Parser {
             case FOR -> cmdFor();
             case RETURN -> cmdReturn();
             case LBRACE -> bloco();
+            case FUNC -> throw erroNoAtual("função só pode ser declarada no nível global");
             default -> throw esperado("comando");
         };
     }
@@ -99,7 +100,13 @@ public final class Parser {
         Stmt.Block entao = bloco();
         Stmt senao = null;
         if (aceitar(ELSE)) {
-            senao = verificar(IF) ? cmdIf() : bloco();
+            if (verificar(IF)) {
+                senao = cmdIf();
+            } else if (verificar(LBRACE)) {
+                senao = bloco();
+            } else {
+                throw esperado("'{' ou 'if' após 'else'");
+            }
         }
         return new Stmt.If(cond, entao, senao, si.linha(), si.coluna());
     }
@@ -163,13 +170,16 @@ public final class Parser {
 
     /** Comando que começa com identificador: chamada se vier "(", atribuição se vier "=". */
     private Stmt atribuicaoOuChamada() {
-        Token nome = consumir(ID, "identificador");
-        if (verificar(LPAREN)) {
-            Expr.Call call = chamada(nome);
-            return new Stmt.CallStmt(call, nome.linha(), nome.coluna());
+        TokenType seguinte = tokens.get(pos + 1).type(); // existe: a lista sempre termina em EOF
+        if (seguinte == ASSIGN) {
+            return atribuicao();
         }
-        consumir(ASSIGN, "'='");
-        return new Stmt.Assign(nome.lexema(), expr(), nome.linha(), nome.coluna());
+        Token nome = avancar();
+        if (!verificar(LPAREN)) {
+            throw esperado("'=' ou '(' após identificador");
+        }
+        Expr.Call call = chamada(nome);
+        return new Stmt.CallStmt(call, nome.linha(), nome.coluna());
     }
 
     // cmdPrint = "print" "(" expr ")" ";" ;
@@ -263,7 +273,11 @@ public final class Parser {
             return esq;
         }
         Token op = avancar();
-        return new Expr.Binary(bop, esq, aditiva(), op.linha(), op.coluna());
+        Expr comparacao = new Expr.Binary(bop, esq, aditiva(), op.linha(), op.coluna());
+        if (operadorRelacional(atual().type()) != null) {
+            throw erroNoAtual("operador relacional não pode ser encadeado (use && para combinar comparações)");
+        }
+        return comparacao;
     }
 
     private static BinaryOp operadorRelacional(TokenType tipo) {

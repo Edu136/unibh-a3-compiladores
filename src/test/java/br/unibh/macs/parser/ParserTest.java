@@ -341,6 +341,85 @@ class ParserTest {
                 "      IntLit 2");
     }
 
+    // ---------- erros sintáticos ----------
+
+    @Test
+    @DisplayName("falta de ';' aponta para o fim da linha onde ele faltou")
+    void faltaPontoEVirgula() {
+        assertErro("var x: int = 1\nprint(x);", 1, 15, "esperado ';', encontrado 'print'");
+    }
+
+    @Test
+    void faltaFechaParenteses() {
+        assertErro("print(x;", 1, 8, "esperado ')', encontrado ';'");
+    }
+
+    @Test
+    void relacionalEncadeado() {
+        assertErro("var b: bool = a < b < c;", 1, 21,
+                "operador relacional não pode ser encadeado (use && para combinar comparações)");
+    }
+
+    @Test
+    void expressaoSoltaComoComando() {
+        assertErro("x + 1;", 1, 3, "esperado '=' ou '(' após identificador, encontrado '+'");
+    }
+
+    @Test
+    void funcaoDentroDeBloco() {
+        assertErro("{ func f(): int { return 1; } }", 1, 3, "função só pode ser declarada no nível global");
+    }
+
+    @Test
+    void tipoVoid() {
+        assertErro("func f(): void {}", 1, 11, "esperado tipo, encontrado identificador 'void'");
+    }
+
+    @Test
+    void cast() {
+        assertErro("var x: int = (int) y;", 1, 15, "esperado expressão, encontrado 'int'");
+    }
+
+    @Test
+    void blocoNaoFechado() {
+        assertErro("if (x) {", 1, 9, "esperado '}', encontrado fim do arquivo");
+    }
+
+    @Test
+    void elseSemBlocoNemIf() {
+        assertErro("if (x) {} else print(1);", 1, 16, "esperado '{' ou 'if' após 'else', encontrado 'print'");
+    }
+
+    @Test
+    void returnSemExpressao() {
+        assertErro("return;", 1, 7, "esperado expressão, encontrado ';'");
+    }
+
+    @Test
+    void inputComExpressao() {
+        assertErro("input(x + 1);", 1, 9, "esperado ')', encontrado '+'");
+    }
+
+    @Test
+    void whileSemParenteses() {
+        assertErro("while x {}", 1, 7, "esperado '(', encontrado identificador 'x'");
+    }
+
+    @Test
+    void comandoInvalido() {
+        assertErro(") ;", 1, 1, "esperado comando, encontrado ')'");
+    }
+
+    @Test
+    void nomeDeVariavelInvalido() {
+        assertErro("var 1x: int;", 1, 5, "esperado identificador, encontrado literal 1");
+    }
+
+    @Test
+    void elseSemIf() {
+        assertErro("else { }", 1, 1, "esperado comando, encontrado 'else'");
+    }
+
     @Test
     @DisplayName("programa vazio ou só com comentário")
     void programaVazio() {
