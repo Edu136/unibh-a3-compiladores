@@ -85,11 +85,17 @@ public final class Main {
             }
             Program programa = Parser.analisar(tokens);
             if (mostrarAst) {
-                out.print(AstPrinter.imprimir(programa));
+                // println linha a linha: mesmo fim de linha do sistema que o --tokens
+                AstPrinter.imprimir(programa).lines().forEach(out::println);
             }
             return SUCESSO;
         } catch (CompileError e) {
             err.println(e.formatar(arquivo));
+            return ERRO_COMPILACAO;
+        } catch (StackOverflowError e) {
+            // o parser é recursivo: milhares de parênteses ou unários aninhados esgotam a pilha
+            err.println(arquivo + ": erro sintático: aninhamento profundo demais"
+                    + " (expressões ou blocos aninhados em excesso)");
             return ERRO_COMPILACAO;
         }
     }

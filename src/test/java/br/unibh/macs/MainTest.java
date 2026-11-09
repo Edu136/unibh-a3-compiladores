@@ -126,6 +126,23 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("aninhamento profundo demais vira erro, sem stack trace")
+    void aninhamentoProfundo() throws IOException {
+        String fonte = "print(" + "- ".repeat(50_000) + "1);";
+        assertEquals(1, executar(arquivo("fundo.macs", fonte)));
+        assertTrue(err().contains("fundo.macs: erro sintático: aninhamento profundo demais"), err());
+        assertFalse(err().contains("StackOverflowError"), err());
+    }
+
+    @Test
+    @DisplayName("--tokens e --ast usam o mesmo fim de linha do sistema")
+    void finaisDeLinhaConsistentes() throws IOException {
+        assertEquals(0, executar(arquivo("ok.macs", "print(1);"), "--tokens", "--ast"));
+        String semSeparadorDoSistema = out().replace(System.lineSeparator(), "");
+        assertFalse(semSeparadorDoSistema.contains("\n") || semSeparadorDoSistema.contains("\r"), out());
+    }
+
+    @Test
     @DisplayName("vetor é rejeitado já no léxico")
     void vetorRejeitadoNoLexico() throws IOException {
         assertEquals(1, executar(arquivo("v.macs", "a[0] = 1;"), "--ast"));
