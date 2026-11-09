@@ -78,7 +78,58 @@ class MainTest {
     @Test
     void semArgumentos() {
         assertEquals(2, executar());
-        assertTrue(err().contains("uso: macsc <arquivo.macs> [--tokens]"), err());
+        assertTrue(err().contains("uso: macsc <arquivo.macs> [--tokens] [--ast]"), err());
+    }
+
+    // ---------- fase sintática ----------
+
+    @Test
+    @DisplayName("--ast imprime a árvore e sai com 0")
+    void astComSucesso() throws IOException {
+        int rc = executar(arquivo("ok.macs", "var x: int = 1 + 2;"), "--ast");
+
+        assertEquals(0, rc);
+        assertEquals(String.join("\n",
+                        "Program",
+                        "  VarDecl x: int",
+                        "    Binary +",
+                        "      IntLit 1",
+                        "      IntLit 2"),
+                out().strip().replace("\r\n", "\n"));
+        assertEquals("", err());
+    }
+
+    @Test
+    @DisplayName("erro sintático vai para o stderr e sai com 1")
+    void erroSintatico() throws IOException {
+        int rc = executar(arquivo("ruim.macs", "print(1"), "--ast");
+
+        assertEquals(1, rc);
+        assertTrue(err().contains("ruim.macs:1:8: erro sintático: esperado ')', encontrado fim do arquivo"), err());
+        assertEquals("", out());
+    }
+
+    @Test
+    @DisplayName("--tokens e --ast juntos: tokens primeiro, depois a árvore")
+    void tokensEAst() throws IOException {
+        assertEquals(0, executar(arquivo("ok.macs", "print(1);"), "--tokens", "--ast"));
+        String saida = out();
+        assertTrue(saida.startsWith("1:1  PRINT  print"), saida);
+        assertTrue(saida.indexOf("1:10  EOF") < saida.indexOf("Program"), saida);
+    }
+
+    @Test
+    @DisplayName("sem flags, a sintaxe também é verificada")
+    void semFlagsVerificaSintaxe() throws IOException {
+        assertEquals(1, executar(arquivo("ruim.macs", "print(1")));
+        assertTrue(err().contains("erro sintático"), err());
+    }
+
+    @Test
+    @DisplayName("vetor é rejeitado já no léxico")
+    void vetorRejeitadoNoLexico() throws IOException {
+        assertEquals(1, executar(arquivo("v.macs", "a[0] = 1;"), "--ast"));
+        assertTrue(err().contains("v.macs:1:2: erro léxico: caractere inesperado '['"), err());
     }
 
     @Test
@@ -103,9 +154,9 @@ class MainTest {
     @Test
     @DisplayName("arquivo salvo em ANSI (Windows-1252) é lido corretamente")
     void arquivoAnsi() throws IOException {
-        byte[] ansi = "\"número\"".getBytes(java.nio.charset.Charset.forName("windows-1252"));
+        byte[] ansi = "print(\"número\");".getBytes(java.nio.charset.Charset.forName("windows-1252"));
         assertEquals(0, executar(arquivo("ansi.macs", ansi), "--tokens"));
-        assertTrue(out().startsWith("1:1  STRING_LIT  \"número\""), out());
+        assertTrue(out().contains("1:7  STRING_LIT  \"número\""), out());
     }
 
     @Test
@@ -118,14 +169,14 @@ class MainTest {
     @Test
     @DisplayName("acentos aparecem corretos na saída de --tokens")
     void acentosNaSaida() throws IOException {
-        assertEquals(0, executar(arquivo("s.macs", "\"olá\""), "--tokens"));
-        assertTrue(out().startsWith("1:1  STRING_LIT  \"olá\""), out());
+        assertEquals(0, executar(arquivo("s.macs", "print(\"olá\");"), "--tokens"));
+        assertTrue(out().contains("1:7  STRING_LIT  \"olá\""), out());
     }
 
     @Test
     @DisplayName("BOM UTF-8 no início do arquivo é ignorado")
     void bomUtf8() throws IOException {
-        byte[] comBom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF, 'x'};
+        byte[] comBom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF, 'x', '=', '1', ';'};
         assertEquals(0, executar(arquivo("bom.macs", comBom), "--tokens"));
         assertTrue(out().startsWith("1:1  ID  x"), out());
     }

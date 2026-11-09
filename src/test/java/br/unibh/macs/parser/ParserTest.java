@@ -8,6 +8,8 @@ import br.unibh.macs.ast.Program;
 import br.unibh.macs.ast.Stmt;
 import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Lexer;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -339,6 +341,22 @@ class ParserTest {
                 "        StringLit \"a\"",
                 "        IntLit 1",
                 "      IntLit 2");
+    }
+
+    // ---------- programa completo ----------
+
+    @Test
+    @DisplayName("programa do fatorial gera a árvore esperada")
+    void programaFatorial() throws Exception {
+        String esperado = recurso("fatorial.ast").replace("\r\n", "\n");
+        assertEquals(esperado, arvore(recurso("fatorial.macs")));
+    }
+
+    private static String recurso(String nome) throws Exception {
+        try (InputStream in = ParserTest.class.getResourceAsStream("/" + nome)) {
+            assertNotNull(in, "recurso de teste não encontrado: " + nome);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     // ---------- erros sintáticos ----------
