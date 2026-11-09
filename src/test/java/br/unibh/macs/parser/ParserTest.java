@@ -3,7 +3,9 @@ package br.unibh.macs.parser;
 import static org.junit.jupiter.api.Assertions.*;
 
 import br.unibh.macs.ast.AstPrinter;
+import br.unibh.macs.ast.Expr;
 import br.unibh.macs.ast.Program;
+import br.unibh.macs.ast.Stmt;
 import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Lexer;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +88,140 @@ class ParserTest {
                 "    Block",
                 "    VarDecl x: char",
                 "      CharLit 'a'");
+    }
+
+    // ---------- expressões ----------
+
+    @Test
+    @DisplayName("multiplicação tem precedência sobre soma")
+    void precedenciaMultiplicacao() {
+        assertArvore("print(1 + 2 * 3);",
+                "Program",
+                "  Print",
+                "    Binary +",
+                "      IntLit 1",
+                "      Binary *",
+                "        IntLit 2",
+                "        IntLit 3");
+    }
+
+    @Test
+    @DisplayName("operadores binários associam à esquerda")
+    void associatividadeEsquerda() {
+        assertArvore("print(a - b - c);",
+                "Program",
+                "  Print",
+                "    Binary -",
+                "      Binary -",
+                "        Var a",
+                "        Var b",
+                "      Var c");
+    }
+
+    @Test
+    @DisplayName("cadeia completa de precedência")
+    void cadeiaDePrecedencia() {
+        assertArvore("print(a || b && c == d < e + f * -g);",
+                "Program",
+                "  Print",
+                "    Binary ||",
+                "      Var a",
+                "      Binary &&",
+                "        Var b",
+                "        Binary ==",
+                "          Var c",
+                "          Binary <",
+                "            Var d",
+                "            Binary +",
+                "              Var e",
+                "              Binary *",
+                "                Var f",
+                "                Unary -",
+                "                  Var g");
+    }
+
+    @Test
+    @DisplayName("parênteses mudam a precedência")
+    void parenteses() {
+        assertArvore("print((1 + 2) * 3);",
+                "Program",
+                "  Print",
+                "    Binary *",
+                "      Binary +",
+                "        IntLit 1",
+                "        IntLit 2",
+                "      IntLit 3");
+    }
+
+    @Test
+    @DisplayName("unários podem se repetir")
+    void unariosRepetidos() {
+        assertArvore("print(!!x); print(- -y);",
+                "Program",
+                "  Print",
+                "    Unary !",
+                "      Unary !",
+                "        Var x",
+                "  Print",
+                "    Unary -",
+                "      Unary -",
+                "        Var y");
+    }
+
+    @Test
+    @DisplayName("chamadas dentro de expressões, com e sem argumentos")
+    void chamadasEmExpressoes() {
+        assertArvore("print(f() + g(h(1), 2 + 3));",
+                "Program",
+                "  Print",
+                "    Binary +",
+                "      Call f",
+                "      Call g",
+                "        Call h",
+                "          IntLit 1",
+                "        Binary +",
+                "          IntLit 2",
+                "          IntLit 3");
+    }
+
+    @Test
+    @DisplayName("todos os tipos de literal")
+    void literais() {
+        assertArvore("print(3.14); print('\\n'); print(\"a\\tb\"); print(false);",
+                "Program",
+                "  Print",
+                "    FloatLit 3.14",
+                "  Print",
+                "    CharLit '\\n'",
+                "  Print",
+                "    StringLit \"a\\tb\"",
+                "  Print",
+                "    BoolLit false");
+    }
+
+    @Test
+    @DisplayName("nós guardam a posição: Binary fica no operador")
+    void posicoes() {
+        Stmt.VarDecl d = (Stmt.VarDecl) analisar("var x: int = a + 1;").itens().get(0);
+        Expr.Binary soma = (Expr.Binary) d.init();
+        assertAll(
+                () -> assertEquals(1, d.coluna()),
+                () -> assertEquals(16, soma.coluna()),
+                () -> assertEquals(14, soma.esq().coluna()),
+                () -> assertNull(soma.getType(), "tipo só é preenchido pelo semântico"));
+    }
+
+    @Test
+    @DisplayName("concatenação associa à esquerda")
+    void concatenacao() {
+        assertArvore("print(\"a\" + 1 + 2);",
+                "Program",
+                "  Print",
+                "    Binary +",
+                "      Binary +",
+                "        StringLit \"a\"",
+                "        IntLit 1",
+                "      IntLit 2");
     }
 
     @Test

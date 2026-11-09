@@ -2,12 +2,14 @@ package br.unibh.macs.parser;
 
 import static br.unibh.macs.lexer.TokenType.*;
 
+import br.unibh.macs.ast.BinaryOp;
 import br.unibh.macs.ast.Expr;
 import br.unibh.macs.ast.FuncDecl;
 import br.unibh.macs.ast.Item;
 import br.unibh.macs.ast.Program;
 import br.unibh.macs.ast.Stmt;
 import br.unibh.macs.ast.Type;
+import br.unibh.macs.ast.UnaryOp;
 import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Token;
 import br.unibh.macs.lexer.TokenType;
@@ -129,7 +131,96 @@ public final class Parser {
 
     // ---------- expressões ----------
 
+    // expr = ou ;
     private Expr expr() {
+        return ou();
+    }
+
+    // ou = e { "||" e } ;
+    private Expr ou() {
+        Expr esq = e();
+        while (verificar(OR)) {
+            Token op = avancar();
+            esq = new Expr.Binary(BinaryOp.OR, esq, e(), op.linha(), op.coluna());
+        }
+        return esq;
+    }
+
+    // e = igualdade { "&&" igualdade } ;
+    private Expr e() {
+        Expr esq = igualdade();
+        while (verificar(AND)) {
+            Token op = avancar();
+            esq = new Expr.Binary(BinaryOp.AND, esq, igualdade(), op.linha(), op.coluna());
+        }
+        return esq;
+    }
+
+    // igualdade = relacional { ( "==" | "!=" ) relacional } ;
+    private Expr igualdade() {
+        Expr esq = relacional();
+        while (verificar(EQ) || verificar(NE)) {
+            Token op = avancar();
+            BinaryOp bop = op.type() == EQ ? BinaryOp.EQ : BinaryOp.NE;
+            esq = new Expr.Binary(bop, esq, relacional(), op.linha(), op.coluna());
+        }
+        return esq;
+    }
+
+    // relacional = aditiva [ ( "<" | "<=" | ">" | ">=" ) aditiva ] ;   (não encadeia)
+    private Expr relacional() {
+        Expr esq = aditiva();
+        BinaryOp bop = operadorRelacional(atual().type());
+        if (bop == null) {
+            return esq;
+        }
+        Token op = avancar();
+        return new Expr.Binary(bop, esq, aditiva(), op.linha(), op.coluna());
+    }
+
+    private static BinaryOp operadorRelacional(TokenType tipo) {
+        return switch (tipo) {
+            case LT -> BinaryOp.LT;
+            case LE -> BinaryOp.LE;
+            case GT -> BinaryOp.GT;
+            case GE -> BinaryOp.GE;
+            default -> null;
+        };
+    }
+
+    // aditiva = mult { ( "+" | "-" ) mult } ;
+    private Expr aditiva() {
+        Expr esq = mult();
+        while (verificar(PLUS) || verificar(MINUS)) {
+            Token op = avancar();
+            BinaryOp bop = op.type() == PLUS ? BinaryOp.ADD : BinaryOp.SUB;
+            esq = new Expr.Binary(bop, esq, mult(), op.linha(), op.coluna());
+        }
+        return esq;
+    }
+
+    // mult = unaria { ( "*" | "/" | "%" ) unaria } ;
+    private Expr mult() {
+        Expr esq = unaria();
+        while (verificar(STAR) || verificar(SLASH) || verificar(PERCENT)) {
+            Token op = avancar();
+            BinaryOp bop = switch (op.type()) {
+                case STAR -> BinaryOp.MUL;
+                case SLASH -> BinaryOp.DIV;
+                default -> BinaryOp.MOD;
+            };
+            esq = new Expr.Binary(bop, esq, unaria(), op.linha(), op.coluna());
+        }
+        return esq;
+    }
+
+    // unaria = ( "!" | "-" ) unaria | primaria ;
+    private Expr unaria() {
+        if (verificar(NOT) || verificar(MINUS)) {
+            Token op = avancar();
+            UnaryOp uop = op.type() == NOT ? UnaryOp.NOT : UnaryOp.NEG;
+            return new Expr.Unary(uop, unaria(), op.linha(), op.coluna());
+        }
         return primaria();
     }
 
@@ -160,6 +251,12 @@ public final class Parser {
             case ID -> {
                 avancar();
                 yield verificar(LPAREN) ? chamada(t) : new Expr.Var(t.lexema(), t.linha(), t.coluna());
+            }
+            case LPAREN -> {
+                avancar();
+                Expr dentro = expr();
+                consumir(RPAREN, "')'");
+                yield dentro;
             }
             default -> throw esperado("expressão");
         };
