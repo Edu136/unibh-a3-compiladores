@@ -1,8 +1,11 @@
 package br.unibh.macs;
 
+import br.unibh.macs.ast.AstPrinter;
+import br.unibh.macs.ast.Program;
 import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Lexer;
 import br.unibh.macs.lexer.Token;
+import br.unibh.macs.parser.Parser;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
@@ -16,14 +19,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens]}. */
+/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens] [--ast]}. */
 public final class Main {
 
     static final int SUCESSO = 0;
     static final int ERRO_COMPILACAO = 1;
     static final int ERRO_USO = 2;
 
-    private static final String USO = "uso: macsc <arquivo.macs> [--tokens]";
+    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast]";
     private static final char BOM = '﻿';
     private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
 
@@ -38,10 +41,13 @@ public final class Main {
     static int run(String[] args, PrintStream out, PrintStream err) {
         String arquivo = null;
         boolean mostrarTokens = false;
+        boolean mostrarAst = false;
 
         for (String arg : args) {
             if (arg.equals("--tokens")) {
                 mostrarTokens = true;
+            } else if (arg.equals("--ast")) {
+                mostrarAst = true;
             } else if (arg.startsWith("--")) {
                 err.println("opção desconhecida: " + arg);
                 err.println(USO);
@@ -77,9 +83,19 @@ public final class Main {
             if (mostrarTokens) {
                 imprimirTokens(tokens, out);
             }
+            Program programa = Parser.analisar(tokens);
+            if (mostrarAst) {
+                // println linha a linha: mesmo fim de linha do sistema que o --tokens
+                AstPrinter.imprimir(programa).lines().forEach(out::println);
+            }
             return SUCESSO;
         } catch (CompileError e) {
             err.println(e.formatar(arquivo));
+            return ERRO_COMPILACAO;
+        } catch (StackOverflowError e) {
+            // o parser é recursivo: milhares de parênteses ou unários aninhados esgotam a pilha
+            err.println(arquivo + ": erro sintático: aninhamento profundo demais"
+                    + " (expressões ou blocos aninhados em excesso)");
             return ERRO_COMPILACAO;
         }
     }
