@@ -94,6 +94,13 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("mais de um arquivo é erro de uso")
+    void doisArquivos() throws IOException {
+        assertEquals(2, executar(arquivo("a.macs", "x"), arquivo("b.macs", "y")));
+        assertTrue(err().contains("uso: macsc"), err());
+    }
+
+    @Test
     @DisplayName("acentos aparecem corretos na saída de --tokens")
     void acentosNaSaida() throws IOException {
         assertEquals(0, executar(arquivo("s.macs", "\"olá\""), "--tokens"));
