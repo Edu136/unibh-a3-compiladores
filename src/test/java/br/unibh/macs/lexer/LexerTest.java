@@ -156,6 +156,91 @@ class LexerTest {
         assertErro(".5", 1, 1, "caractere inesperado '.'");
     }
 
+    // ---------- operadores e pontuação ----------
+
+    @Test
+    @DisplayName("todos os operadores e sinais de pontuação")
+    void operadores() {
+        assertEquals(
+                List.of(PLUS, MINUS, STAR, SLASH, PERCENT, ASSIGN, EQ, NE, LT, LE, GT, GE, AND, OR, NOT,
+                        LPAREN, RPAREN, LBRACE, RBRACE, COMMA, SEMICOLON, COLON, EOF),
+                tipos("+ - * / % = == != < <= > >= && || ! ( ) { } , ; :"));
+    }
+
+    @Test
+    @DisplayName("operadores de dois caracteres têm prioridade (maior casamento)")
+    void maiorCasamento() {
+        assertEquals(List.of(ID, LE, ID, EOF), tipos("a<=b"));
+        assertEquals(List.of(ID, EQ, MINUS, ID, EOF), tipos("a==-b"));
+        assertEquals(List.of(NOT, NOT, ID, NE, ID, EOF), tipos("!!a!=b"));
+    }
+
+    @Test
+    @DisplayName("o sinal de menos não faz parte do número")
+    void sinalNaoFazParteDoNumero() {
+        assertEquals(List.of(MINUS, INT_LIT, EOF), tipos("-5"));
+        assertEquals(List.of(ID, MINUS, INT_LIT, EOF), tipos("x-1"));
+    }
+
+    @Test
+    void ecomercialIsolado() {
+        assertErro("a & b", 1, 3, "'&' isolado: esperado '&&'");
+    }
+
+    @Test
+    void barraVerticalIsolada() {
+        assertErro("a | b", 1, 3, "'|' isolado: esperado '||'");
+    }
+
+    // ---------- comentários ----------
+
+    @Test
+    @DisplayName("comentários de linha e de bloco são ignorados")
+    void comentarios() {
+        List<Token> t = tokens("x // fim\n/* várias\nlinhas */ y");
+        assertEquals(3, t.size());
+        assertToken(t.get(0), ID, "x", 1, 1);
+        assertToken(t.get(1), ID, "y", 3, 11);
+    }
+
+    @Test
+    @DisplayName("barra é divisão quando não inicia comentário")
+    void divisaoVersusComentario() {
+        assertEquals(List.of(ID, SLASH, ID, SLASH, ID, EOF), tipos("a / b /* c */ / d"));
+    }
+
+    @Test
+    @DisplayName("arquivo só com comentário gera EOF na linha seguinte")
+    void soComentario() {
+        List<Token> t = tokens("// nada\n");
+        assertEquals(1, t.size());
+        assertToken(t.get(0), EOF, "", 2, 1);
+    }
+
+    @Test
+    void comentarioDeBlocoNaoTerminado() {
+        assertErro("/* nunca fecha", 1, 1, "comentário de bloco não terminado");
+    }
+
+    // ---------- caracteres inválidos ----------
+
+    @Test
+    void caractereInvalido() {
+        assertErro("x @ y", 1, 3, "caractere inesperado '@'");
+    }
+
+    @Test
+    @DisplayName("identificadores aceitam só letras ASCII")
+    void identificadorComAcento() {
+        assertErro("variável", 1, 5, "caractere inesperado 'á'");
+    }
+
+    @Test
+    @DisplayName("erro aponta linha e coluna corretas depois da primeira linha")
+    void erroEmOutraLinha() {
+        assertErro("x\n  y $", 2, 5, "caractere inesperado '$'");
+    }
+
     // ---------- posições ----------
 
     @Test

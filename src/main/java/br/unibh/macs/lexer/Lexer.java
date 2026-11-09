@@ -74,9 +74,34 @@ public final class Lexer {
             switch (c) {
                 case '"' -> lerString();
                 case '\'' -> lerChar();
-                case ':' -> adicionar(TokenType.COLON);
+                case '+' -> adicionar(TokenType.PLUS);
+                case '-' -> adicionar(TokenType.MINUS);
+                case '*' -> adicionar(TokenType.STAR);
+                case '/' -> adicionar(TokenType.SLASH); // comentários já foram pulados
+                case '%' -> adicionar(TokenType.PERCENT);
+                case '(' -> adicionar(TokenType.LPAREN);
+                case ')' -> adicionar(TokenType.RPAREN);
+                case '{' -> adicionar(TokenType.LBRACE);
+                case '}' -> adicionar(TokenType.RBRACE);
+                case ',' -> adicionar(TokenType.COMMA);
                 case ';' -> adicionar(TokenType.SEMICOLON);
-                case '=' -> adicionar(TokenType.ASSIGN);
+                case ':' -> adicionar(TokenType.COLON);
+                case '=' -> adicionar(seguidoDe('=') ? TokenType.EQ : TokenType.ASSIGN);
+                case '!' -> adicionar(seguidoDe('=') ? TokenType.NE : TokenType.NOT);
+                case '<' -> adicionar(seguidoDe('=') ? TokenType.LE : TokenType.LT);
+                case '>' -> adicionar(seguidoDe('=') ? TokenType.GE : TokenType.GT);
+                case '&' -> {
+                    if (!seguidoDe('&')) {
+                        throw erro("'&' isolado: esperado '&&'");
+                    }
+                    adicionar(TokenType.AND);
+                }
+                case '|' -> {
+                    if (!seguidoDe('|')) {
+                        throw erro("'|' isolado: esperado '||'");
+                    }
+                    adicionar(TokenType.OR);
+                }
                 default -> throw erro("caractere inesperado '" + c + "'");
             }
         }
@@ -184,17 +209,38 @@ public final class Lexer {
         return false;
     }
 
-    // ---------- espaços ----------
+    // ---------- espaços e comentários ----------
 
     private void pularEspacos() {
         while (!fim()) {
             char c = atual();
-            if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+            if (c == ' ' || c == '\t' || ehQuebraDeLinha(c)) {
                 avancar();
+            } else if (c == '/' && proximo() == '/') {
+                while (!fim() && !ehQuebraDeLinha(atual())) {
+                    avancar();
+                }
+            } else if (c == '/' && proximo() == '*') {
+                pularComentarioDeBloco();
             } else {
                 return;
             }
         }
+    }
+
+    private void pularComentarioDeBloco() {
+        marcarInicio(); // para o erro apontar o "/*"
+        avancar();
+        avancar();
+        while (!fim()) {
+            if (atual() == '*' && proximo() == '/') {
+                avancar();
+                avancar();
+                return;
+            }
+            avancar();
+        }
+        throw erro("comentário de bloco não terminado");
     }
 
     // ---------- navegação ----------
@@ -205,6 +251,20 @@ public final class Lexer {
 
     private char atual() {
         return fonte.charAt(pos);
+    }
+
+    /** Caractere depois do atual, ou '\0' no fim. */
+    private char proximo() {
+        return pos + 1 < fonte.length() ? fonte.charAt(pos + 1) : '\0';
+    }
+
+    /** Se o próximo caractere for o esperado, consome e devolve true. */
+    private boolean seguidoDe(char esperado) {
+        if (!fim() && atual() == esperado) {
+            avancar();
+            return true;
+        }
+        return false;
     }
 
     /** Consome um caractere atualizando linha e coluna. "\r\n" conta como uma única quebra. */
