@@ -94,6 +94,21 @@ class MainTest {
     }
 
     @Test
+    @DisplayName("caminho com caractere inválido é erro de uso, sem exceção")
+    void caminhoInvalido() {
+        assertEquals(2, executar("a?b.macs"));
+        assertTrue(err().contains("caminho de arquivo inválido: a?b.macs"), err());
+    }
+
+    @Test
+    @DisplayName("arquivo salvo em ANSI (Windows-1252) é lido corretamente")
+    void arquivoAnsi() throws IOException {
+        byte[] ansi = "\"número\"".getBytes(java.nio.charset.Charset.forName("windows-1252"));
+        assertEquals(0, executar(arquivo("ansi.macs", ansi), "--tokens"));
+        assertTrue(out().startsWith("1:1  STRING_LIT  \"número\""), out());
+    }
+
+    @Test
     @DisplayName("mais de um arquivo é erro de uso")
     void doisArquivos() throws IOException {
         assertEquals(2, executar(arquivo("a.macs", "x"), arquivo("b.macs", "y")));

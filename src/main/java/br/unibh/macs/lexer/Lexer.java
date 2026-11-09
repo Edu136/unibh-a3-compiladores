@@ -102,7 +102,7 @@ public final class Lexer {
                     }
                     adicionar(TokenType.OR);
                 }
-                default -> throw erro("caractere inesperado '" + c + "'");
+                default -> throw erro("caractere inesperado " + descrever(c));
             }
         }
     }
@@ -308,6 +308,17 @@ public final class Lexer {
 
     private static boolean ehLetra(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    }
+
+    /**
+     * Mostra o caractere entre aspas, ou pelo código Unicode quando ele não aparece na tela
+     * (ex.: espaço não separável U+00A0, comum em código copiado de PDF ou Word).
+     */
+    private static String descrever(char c) {
+        int tipo = Character.getType(c);
+        boolean invisivel = Character.isWhitespace(c) || Character.isISOControl(c)
+                || tipo == Character.SPACE_SEPARATOR || tipo == Character.FORMAT;
+        return invisivel ? String.format("U+%04X (invisível)", (int) c) : "'" + c + "'";
     }
 
     private static boolean ehQuebraDeLinha(char c) {

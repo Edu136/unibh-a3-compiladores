@@ -239,6 +239,21 @@ class LexerTest {
     }
 
     @Test
+    @DisplayName("caractere invisível aparece pelo código Unicode")
+    void caractereInvisivel() {
+        assertErro("var x:\u00A0int;", 1, 7, "caractere inesperado U+00A0 (invisível)");
+        assertErro("x\u200By", 1, 2, "caractere inesperado U+200B (invisível)");
+    }
+
+    @Test
+    @DisplayName("string vazia é válida")
+    void stringVazia() {
+        Token t = tokens("\"\"").get(0);
+        assertEquals(STRING_LIT, t.type());
+        assertEquals("", t.valor());
+    }
+
+    @Test
     @DisplayName("erro aponta linha e coluna corretas depois da primeira linha")
     void erroEmOutraLinha() {
         assertErro("x\n  y $", 2, 5, "caractere inesperado '$'");
