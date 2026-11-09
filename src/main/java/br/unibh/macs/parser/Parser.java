@@ -37,9 +37,34 @@ public final class Parser {
     private Program programa() {
         List<Item> itens = new ArrayList<>();
         while (!verificar(EOF)) {
-            itens.add(comando());
+            itens.add(verificar(FUNC) ? declFuncao() : comando());
         }
         return new Program(itens);
+    }
+
+    // declFuncao = "func" ID "(" [ parametro { "," parametro } ] ")" ":" tipo bloco ;
+    private FuncDecl declFuncao() {
+        Token func = consumir(FUNC, "'func'");
+        Token nome = consumir(ID, "identificador");
+        consumir(LPAREN, "'('");
+        List<FuncDecl.Param> params = new ArrayList<>();
+        if (!verificar(RPAREN)) {
+            do {
+                params.add(parametro());
+            } while (aceitar(COMMA));
+        }
+        consumir(RPAREN, "')'");
+        consumir(COLON, "':'");
+        Type retorno = tipo();
+        Stmt.Block corpo = bloco();
+        return new FuncDecl(nome.lexema(), params, retorno, corpo, func.linha(), func.coluna());
+    }
+
+    // parametro = ID ":" tipo ;
+    private FuncDecl.Param parametro() {
+        Token nome = consumir(ID, "identificador");
+        consumir(COLON, "':'");
+        return new FuncDecl.Param(nome.lexema(), tipo(), nome.linha(), nome.coluna());
     }
 
     // ---------- comandos ----------
@@ -58,9 +83,72 @@ public final class Parser {
             }
             case PRINT -> cmdPrint();
             case INPUT -> cmdInput();
+            case IF -> cmdIf();
+            case WHILE -> cmdWhile();
+            case FOR -> cmdFor();
+            case RETURN -> cmdReturn();
             case LBRACE -> bloco();
             default -> throw esperado("comando");
         };
+    }
+
+    // cmdIf = "if" "(" expr ")" bloco [ "else" ( bloco | cmdIf ) ] ;
+    private Stmt.If cmdIf() {
+        Token si = consumir(IF, "'if'");
+        Expr cond = condicaoEntreParenteses();
+        Stmt.Block entao = bloco();
+        Stmt senao = null;
+        if (aceitar(ELSE)) {
+            senao = verificar(IF) ? cmdIf() : bloco();
+        }
+        return new Stmt.If(cond, entao, senao, si.linha(), si.coluna());
+    }
+
+    // cmdWhile = "while" "(" expr ")" bloco ;
+    private Stmt.While cmdWhile() {
+        Token w = consumir(WHILE, "'while'");
+        Expr cond = condicaoEntreParenteses();
+        return new Stmt.While(cond, bloco(), w.linha(), w.coluna());
+    }
+
+    // cmdFor = "for" "(" [ declVar | atribuicao ] ";" [ expr ] ";" [ atribuicao ] ")" bloco ;
+    private Stmt.For cmdFor() {
+        Token f = consumir(FOR, "'for'");
+        consumir(LPAREN, "'('");
+        Stmt init = null;
+        if (verificar(VAR)) {
+            init = declVar();
+        } else if (verificar(ID)) {
+            init = atribuicao();
+        }
+        consumir(SEMICOLON, "';'");
+        Expr cond = verificar(SEMICOLON) ? null : expr();
+        consumir(SEMICOLON, "';'");
+        Stmt.Assign passo = verificar(RPAREN) ? null : atribuicao();
+        consumir(RPAREN, "')'");
+        return new Stmt.For(init, cond, passo, bloco(), f.linha(), f.coluna());
+    }
+
+    // cmdReturn = "return" expr ";" ;
+    private Stmt.Return cmdReturn() {
+        Token r = consumir(RETURN, "'return'");
+        Expr e = expr();
+        consumirPontoEVirgula();
+        return new Stmt.Return(e, r.linha(), r.coluna());
+    }
+
+    private Expr condicaoEntreParenteses() {
+        consumir(LPAREN, "'('");
+        Expr cond = expr();
+        consumir(RPAREN, "')'");
+        return cond;
+    }
+
+    // atribuicao = ID "=" expr ;
+    private Stmt.Assign atribuicao() {
+        Token nome = consumir(ID, "identificador");
+        consumir(ASSIGN, "'='");
+        return new Stmt.Assign(nome.lexema(), expr(), nome.linha(), nome.coluna());
     }
 
     // declVar = "var" ID ":" tipo [ "=" expr ] ;

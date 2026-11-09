@@ -90,6 +90,123 @@ class ParserTest {
                 "      CharLit 'a'");
     }
 
+    // ---------- controle de fluxo e funções ----------
+
+    @Test
+    @DisplayName("if / else if / else")
+    void ifElseIfElse() {
+        assertArvore("if (a) { x = 1; } else if (b) { x = 2; } else { x = 3; }",
+                "Program",
+                "  If",
+                "    Var a",
+                "    Block",
+                "      Assign x",
+                "        IntLit 1",
+                "    Else",
+                "      If",
+                "        Var b",
+                "        Block",
+                "          Assign x",
+                "            IntLit 2",
+                "        Else",
+                "          Block",
+                "            Assign x",
+                "              IntLit 3");
+    }
+
+    @Test
+    void whileSimples() {
+        assertArvore("while (i < 10) { i = i + 1; }",
+                "Program",
+                "  While",
+                "    Binary <",
+                "      Var i",
+                "      IntLit 10",
+                "    Block",
+                "      Assign i",
+                "        Binary +",
+                "          Var i",
+                "          IntLit 1");
+    }
+
+    @Test
+    @DisplayName("for com as três partes")
+    void forCompleto() {
+        assertArvore("for (var i: int = 0; i < 3; i = i + 1) { print(i); }",
+                "Program",
+                "  For",
+                "    Init",
+                "      VarDecl i: int",
+                "        IntLit 0",
+                "    Cond",
+                "      Binary <",
+                "        Var i",
+                "        IntLit 3",
+                "    Passo",
+                "      Assign i",
+                "        Binary +",
+                "          Var i",
+                "          IntLit 1",
+                "    Block",
+                "      Print",
+                "        Var i");
+    }
+
+    @Test
+    @DisplayName("for com partes vazias")
+    void forComPartesVazias() {
+        assertArvore("for (;;) {}",
+                "Program",
+                "  For",
+                "    Block");
+        assertArvore("for (i = 0; ; ) {}",
+                "Program",
+                "  For",
+                "    Init",
+                "      Assign i",
+                "        IntLit 0",
+                "    Block");
+    }
+
+    @Test
+    @DisplayName("função com parâmetros, return e chamada recursiva")
+    void funcaoComParametros() {
+        assertArvore("func f(n: int, x: float): int { return f(n - 1, x); }",
+                "Program",
+                "  FuncDecl f(n: int, x: float): int",
+                "    Block",
+                "      Return",
+                "        Call f",
+                "          Binary -",
+                "            Var n",
+                "            IntLit 1",
+                "          Var x");
+    }
+
+    @Test
+    @DisplayName("função sem parâmetros e itens intercalados no nível global")
+    void itensIntercalados() {
+        assertArvore("print(1); func g(): bool { return true; } print(g());",
+                "Program",
+                "  Print",
+                "    IntLit 1",
+                "  FuncDecl g(): bool",
+                "    Block",
+                "      Return",
+                "        BoolLit true",
+                "  Print",
+                "    Call g");
+    }
+
+    @Test
+    @DisplayName("return no nível global é aceito pelo sintático")
+    void returnGlobal() {
+        assertArvore("return 0;",
+                "Program",
+                "  Return",
+                "    IntLit 0");
+    }
+
     // ---------- expressões ----------
 
     @Test
