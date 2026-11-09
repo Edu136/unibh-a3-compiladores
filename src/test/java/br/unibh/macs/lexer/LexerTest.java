@@ -73,6 +73,89 @@ class LexerTest {
                 t.subList(0, 5).stream().map(Token::lexema).toList());
     }
 
+    // ---------- literais ----------
+
+    @Test
+    @DisplayName("literais int, float, char e string com seus valores")
+    void literais() {
+        List<Token> t = tokens("0 2147483647 3.14 0.5 'a' \"olá, mundo\"");
+        assertEquals(List.of(INT_LIT, INT_LIT, FLOAT_LIT, FLOAT_LIT, CHAR_LIT, STRING_LIT, EOF),
+                t.stream().map(Token::type).toList());
+        assertEquals(0, t.get(0).valor());
+        assertEquals(2147483647, t.get(1).valor());
+        assertEquals(3.14, t.get(2).valor());
+        assertEquals(0.5, t.get(3).valor());
+        assertEquals('a', t.get(4).valor());
+        assertEquals("olá, mundo", t.get(5).valor());
+        assertEquals("\"olá, mundo\"", t.get(5).lexema());
+    }
+
+    @Test
+    @DisplayName("escapes em string e char")
+    void escapes() {
+        List<Token> t = tokens("\"a\\nb\\t\\\\\\\"\" '\\'' '\\0'");
+        assertEquals("a\nb\t\\\"", t.get(0).valor());
+        assertEquals('\'', t.get(1).valor());
+        assertEquals('\0', t.get(2).valor());
+    }
+
+    @Test
+    @DisplayName("número colado em letras gera dois tokens")
+    void numeroSeguidoDeLetras() {
+        assertEquals(List.of(INT_LIT, ID, EOF), tipos("1abc"));
+    }
+
+    @Test
+    @DisplayName("letra acentuada dentro de string conta uma coluna")
+    void acentoEmString() {
+        assertToken(tokens("\"ção\" x").get(1), ID, "x", 1, 7);
+    }
+
+    @Test
+    void stringNaoTerminada() {
+        assertErro("\"abc", 1, 1, "string não terminada");
+    }
+
+    @Test
+    void stringNaoAtravessaLinha() {
+        assertErro("\"ab\nc\"", 1, 1, "string não terminada");
+    }
+
+    @Test
+    void charNaoTerminado() {
+        assertErro("'a", 1, 1, "char não terminado");
+    }
+
+    @Test
+    void charVazio() {
+        assertErro("''", 1, 1, "char vazio");
+    }
+
+    @Test
+    void charComMaisDeUmCaractere() {
+        assertErro("'ab'", 1, 1, "char com mais de um caractere");
+    }
+
+    @Test
+    void escapeDesconhecido() {
+        assertErro("\"a\\qb\"", 1, 3, "escape desconhecido '\\q'");
+    }
+
+    @Test
+    void inteiroForaDoIntervalo() {
+        assertErro("2147483648", 1, 1, "inteiro fora do intervalo: 2147483648 (máximo 2147483647)");
+    }
+
+    @Test
+    void floatSemDigitoAposPonto() {
+        assertErro("3.", 1, 1, "número malformado: esperado dígito após '.'");
+    }
+
+    @Test
+    void floatComecandoComPonto() {
+        assertErro(".5", 1, 1, "caractere inesperado '.'");
+    }
+
     // ---------- posições ----------
 
     @Test

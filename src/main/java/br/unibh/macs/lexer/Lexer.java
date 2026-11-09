@@ -72,6 +72,8 @@ public final class Lexer {
             lerNumero();
         } else {
             switch (c) {
+                case '"' -> lerString();
+                case '\'' -> lerChar();
                 case ':' -> adicionar(TokenType.COLON);
                 case ';' -> adicionar(TokenType.SEMICOLON);
                 case '=' -> adicionar(TokenType.ASSIGN);
@@ -88,11 +90,98 @@ public final class Lexer {
         adicionar(PALAVRAS_CHAVE.getOrDefault(texto, TokenType.ID));
     }
 
+    /** INT_LIT = D+ ; FLOAT_LIT = D+ "." D+ (sem sinal: o "-" é operador). */
     private void lerNumero() {
+        pularDigitos();
+        if (!fim() && atual() == '.') {
+            avancar();
+            if (fim() || !ehDigito(atual())) {
+                throw erro("número malformado: esperado dígito após '.'");
+            }
+            pularDigitos();
+            adicionar(TokenType.FLOAT_LIT, Double.parseDouble(lexemaAtual()));
+            return;
+        }
+        String texto = lexemaAtual();
+        try {
+            adicionar(TokenType.INT_LIT, Integer.parseInt(texto));
+        } catch (NumberFormatException e) {
+            throw erro("inteiro fora do intervalo: " + texto + " (máximo " + Integer.MAX_VALUE + ")");
+        }
+    }
+
+    private void pularDigitos() {
         while (!fim() && ehDigito(atual())) {
             avancar();
         }
-        adicionar(TokenType.INT_LIT, Integer.parseInt(lexemaAtual()));
+    }
+
+    /** String entre aspas duplas, na mesma linha, com escapes. */
+    private void lerString() {
+        StringBuilder valor = new StringBuilder();
+        while (true) {
+            if (fim() || ehQuebraDeLinha(atual())) {
+                throw erro("string não terminada");
+            }
+            char c = avancar();
+            if (c == '"') {
+                break;
+            }
+            valor.append(c == '\\' ? lerEscape() : c);
+        }
+        adicionar(TokenType.STRING_LIT, valor.toString());
+    }
+
+    /** Char entre aspas simples: exatamente um caractere (ou um escape). */
+    private void lerChar() {
+        if (fim() || ehQuebraDeLinha(atual())) {
+            throw erro("char não terminado");
+        }
+        if (atual() == '\'') {
+            throw erro("char vazio");
+        }
+        char c = avancar();
+        char valor = (c == '\\') ? lerEscape() : c;
+
+        if (!fim() && atual() == '\'') {
+            avancar();
+            adicionar(TokenType.CHAR_LIT, valor);
+            return;
+        }
+        throw erro(existeAspaSimplesNaLinha() ? "char com mais de um caractere" : "char não terminado");
+    }
+
+    /** Lê o caractere após '\' (já consumida) e devolve o valor do escape. */
+    private char lerEscape() {
+        int linhaBarra = linha;
+        int colunaBarra = coluna - 1;
+        if (fim() || ehQuebraDeLinha(atual())) {
+            throw erro(tokenAtualEhString() ? "string não terminada" : "char não terminado");
+        }
+        char c = avancar();
+        return switch (c) {
+            case 'n' -> '\n';
+            case 't' -> '\t';
+            case '0' -> '\0';
+            case '\\' -> '\\';
+            case '"' -> '"';
+            case '\'' -> '\'';
+            default -> throw new CompileError(CompileError.Fase.LEXICO, linhaBarra, colunaBarra,
+                    "escape desconhecido '\\" + c + "'");
+        };
+    }
+
+    private boolean tokenAtualEhString() {
+        return fonte.charAt(inicio) == '"';
+    }
+
+    private boolean existeAspaSimplesNaLinha() {
+        for (int i = pos; i < fonte.length() && !ehQuebraDeLinha(fonte.charAt(i)); i++) {
+            if (fonte.charAt(i) == '\'') {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---------- espaços ----------
@@ -159,6 +248,10 @@ public final class Lexer {
 
     private static boolean ehLetra(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    }
+
+    private static boolean ehQuebraDeLinha(char c) {
+        return c == '\n' || c == '\r';
     }
 
     private static boolean ehDigito(char c) {
