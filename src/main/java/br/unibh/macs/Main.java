@@ -1,12 +1,95 @@
 package br.unibh.macs;
 
+import br.unibh.macs.erro.CompileError;
+import br.unibh.macs.lexer.Lexer;
+import br.unibh.macs.lexer.Token;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.util.List;
+
+/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens]}. */
 public final class Main {
+
+    static final int SUCESSO = 0;
+    static final int ERRO_COMPILACAO = 1;
+    static final int ERRO_USO = 2;
+
+    private static final String USO = "uso: macsc <arquivo.macs> [--tokens]";
+    private static final char BOM = '﻿';
 
     private Main() {
     }
 
     public static void main(String[] args) {
-        System.err.println("uso: macsc <arquivo.macs> [--tokens]");
-        System.exit(2);
+        System.exit(run(args, System.out, System.err));
+    }
+
+    /** Executa o compilador e devolve o código de saída (sem chamar System.exit). */
+    static int run(String[] args, PrintStream out, PrintStream err) {
+        String arquivo = null;
+        boolean mostrarTokens = false;
+
+        for (String arg : args) {
+            if (arg.equals("--tokens")) {
+                mostrarTokens = true;
+            } else if (arg.startsWith("--")) {
+                err.println("opção desconhecida: " + arg);
+                err.println(USO);
+                return ERRO_USO;
+            } else if (arquivo == null) {
+                arquivo = arg;
+            } else {
+                err.println(USO);
+                return ERRO_USO;
+            }
+        }
+        if (arquivo == null) {
+            err.println(USO);
+            return ERRO_USO;
+        }
+
+        String fonte;
+        try {
+            fonte = lerFonte(Path.of(arquivo));
+        } catch (NoSuchFileException e) {
+            err.println("arquivo não encontrado: " + arquivo);
+            return ERRO_USO;
+        } catch (IOException e) {
+            err.println("não foi possível ler " + arquivo + ": " + e.getMessage());
+            return ERRO_USO;
+        }
+
+        try {
+            List<Token> tokens = Lexer.tokenizar(fonte);
+            if (mostrarTokens) {
+                imprimirTokens(tokens, out);
+            }
+            return SUCESSO;
+        } catch (CompileError e) {
+            err.println(e.formatar(arquivo));
+            return ERRO_COMPILACAO;
+        }
+    }
+
+    /** Lê o arquivo como UTF-8, descartando o BOM que alguns editores gravam no início. */
+    private static String lerFonte(Path caminho) throws IOException {
+        String texto = Files.readString(caminho, StandardCharsets.UTF_8);
+        return !texto.isEmpty() && texto.charAt(0) == BOM ? texto.substring(1) : texto;
+    }
+
+    /** Um token por linha: {@code linha:coluna  TIPO  lexema}. */
+    private static void imprimirTokens(List<Token> tokens, PrintStream out) {
+        for (Token t : tokens) {
+            String posicao = t.linha() + ":" + t.coluna();
+            if (t.lexema().isEmpty()) {
+                out.println(posicao + "  " + t.type());
+            } else {
+                out.println(posicao + "  " + t.type() + "  " + t.lexema());
+            }
+        }
     }
 }
