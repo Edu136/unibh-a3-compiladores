@@ -4,6 +4,9 @@ import static br.unibh.macs.lexer.TokenType.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import br.unibh.macs.erro.CompileError;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -239,6 +242,25 @@ class LexerTest {
     @DisplayName("erro aponta linha e coluna corretas depois da primeira linha")
     void erroEmOutraLinha() {
         assertErro("x\n  y $", 2, 5, "caractere inesperado '$'");
+    }
+
+    // ---------- programa completo ----------
+
+    @Test
+    @DisplayName("programa do fatorial gera a sequência de tokens esperada")
+    void programaFatorial() throws Exception {
+        String fonte = recurso("fatorial.macs");
+        List<TokenType> esperado = Arrays.stream(recurso("fatorial.tokens").trim().split("\\s+"))
+                .map(TokenType::valueOf)
+                .toList();
+        assertEquals(esperado, tipos(fonte));
+    }
+
+    private static String recurso(String nome) throws Exception {
+        try (InputStream in = LexerTest.class.getResourceAsStream("/" + nome)) {
+            assertNotNull(in, "recurso de teste não encontrado: " + nome);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     // ---------- posições ----------

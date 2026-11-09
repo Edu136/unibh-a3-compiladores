@@ -1,0 +1,14 @@
+// Calcula o fatorial de 1 até o número digitado
+func fatorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * fatorial(n - 1);
+}
+
+var numero: int;
+print("Digite um número: ");
+input(numero);
+for (var i: int = 1; i <= numero; i = i + 1) {
+    print("Fatorial de " + i + " = " + fatorial(i));
+}
