@@ -10,7 +10,10 @@ import br.unibh.macs.ast.Type;
 import br.unibh.macs.erro.CompileError;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -29,7 +32,14 @@ public final class SemanticAnalyzer {
     private final Resolucao resolucao = new Resolucao();
     private final List<CompileError> erros = new ArrayList<>();
 
+    /** Espaço de nomes das funções (separado do das variáveis). */
+    private final Map<String, FuncSymbol> funcoes = new HashMap<>();
+    /** Símbolo de cada declaração, inclusive das duplicadas (o corpo delas também é analisado). */
+    private final Map<FuncDecl, FuncSymbol> simboloDaDeclaracao = new IdentityHashMap<>();
+
+    private FuncSymbol funcaoAtual = null; // null = código global
     private int proximoSlotGlobal = 0;
+    private int proximoSlotLocal = 0;
 
     private SemanticAnalyzer() {
     }
@@ -39,11 +49,19 @@ public final class SemanticAnalyzer {
     }
 
     private Resultado executar(Program programa) {
+        // 1ª passagem: registra todas as funções (permite chamar antes de declarar e recursão)
+        for (Item item : programa.itens()) {
+            if (item instanceof FuncDecl f) {
+                registrarFuncao(f);
+            }
+        }
+
+        // 2ª passagem: analisa os itens na ordem do arquivo
         tabela.abrir(); // escopo global
         List<Item> itens = new ArrayList<>();
         for (Item item : programa.itens()) {
             itens.add(switch (item) {
-                case FuncDecl f -> f;
+                case FuncDecl f -> funcao(f);
                 case Stmt s -> stmt(s);
             });
         }
@@ -51,6 +69,44 @@ public final class SemanticAnalyzer {
 
         erros.sort(Comparator.comparingInt(CompileError::getLinha).thenComparingInt(CompileError::getColuna));
         return new Resultado(new Program(itens), resolucao, List.copyOf(erros));
+    }
+
+    // ---------- funções ----------
+
+    private void registrarFuncao(FuncDecl f) {
+        List<Type> params = f.params().stream().map(FuncDecl.Param::tipo).toList();
+        FuncSymbol simbolo = new FuncSymbol(f.nome(), params, f.retorno(), f);
+        simboloDaDeclaracao.put(f, simbolo);
+        if (funcoes.containsKey(f.nome())) {
+            erro(f.linha(), f.coluna(), "função '" + f.nome() + "' já declarada");
+        } else {
+            funcoes.put(f.nome(), simbolo);
+        }
+    }
+
+    private FuncDecl funcao(FuncDecl f) {
+        funcaoAtual = simboloDaDeclaracao.get(f);
+        proximoSlotLocal = 0;
+        tabela.entrarFuncao(); // parâmetros e corpo no mesmo escopo; o global fica invisível
+
+        for (FuncDecl.Param p : f.params()) {
+            if (tabela.declaradaNoEscopoAtual(p.nome())) {
+                erro(p.linha(), p.coluna(), "parâmetro '" + p.nome() + "' repetido");
+                continue;
+            }
+            VarSymbol s = new VarSymbol(p.nome(), p.tipo(), false, proximoSlotLocal++);
+            tabela.declarar(s);
+            registrar(p, s);
+        }
+        List<Stmt> corpo = new ArrayList<>();
+        for (Stmt s : f.corpo().stmts()) {
+            corpo.add(stmt(s));
+        }
+
+        tabela.sairFuncao();
+        funcaoAtual = null;
+        Stmt.Block novoCorpo = new Stmt.Block(corpo, f.corpo().linha(), f.corpo().coluna());
+        return new FuncDecl(f.nome(), f.params(), f.retorno(), novoCorpo, f.linha(), f.coluna());
     }
 
     // ---------- comandos ----------
@@ -82,9 +138,22 @@ public final class SemanticAnalyzer {
                 yield new Stmt.For(init, cond, passo, corpo, f.linha(), f.coluna());
             }
             case Stmt.Block b -> bloco(b);
-            case Stmt.CallStmt c -> c;
-            case Stmt.Return r -> r;
+            case Stmt.CallStmt c -> new Stmt.CallStmt(chamada(c.call()), c.linha(), c.coluna());
+            case Stmt.Return r -> retorno(r);
         };
+    }
+
+    private Stmt.Return retorno(Stmt.Return r) {
+        Expr valor = expr(r.expr());
+        if (funcaoAtual == null) {
+            erro(r.linha(), r.coluna(), "return fora de função");
+        } else {
+            FuncSymbol f = funcaoAtual;
+            valor = compativel(valor, f.retorno(), r.linha(), r.coluna(),
+                    t -> "return incompatível: função '" + f.nome() + "' retorna " + f.retorno().nome()
+                            + ", valor é " + t.nome());
+        }
+        return new Stmt.Return(valor, r.linha(), r.coluna());
     }
 
     private Stmt.Block bloco(Stmt.Block b) {
@@ -109,7 +178,8 @@ public final class SemanticAnalyzer {
             erro(d.linha(), d.coluna(), "variável '" + d.nome() + "' já declarada neste escopo");
             return nova;
         }
-        VarSymbol s = new VarSymbol(d.nome(), d.tipo(), true, proximoSlotGlobal++);
+        boolean global = funcaoAtual == null;
+        VarSymbol s = new VarSymbol(d.nome(), d.tipo(), global, global ? proximoSlotGlobal++ : proximoSlotLocal++);
         tabela.declarar(s);
         registrar(nova, s);
         return nova;
@@ -147,8 +217,38 @@ public final class SemanticAnalyzer {
             case Expr.Unary u -> unaria(u);
             case Expr.Binary b -> binaria(b);
             case Expr.Convert c -> c;
-            case Expr.Call c -> c;
+            case Expr.Call c -> chamada(c);
         };
+    }
+
+    /** Verifica existência, quantidade e tipo dos argumentos. Os argumentos são sempre analisados. */
+    private Expr.Call chamada(Expr.Call c) {
+        List<Expr> args = new ArrayList<>();
+        for (Expr a : c.args()) {
+            args.add(expr(a));
+        }
+        FuncSymbol f = funcoes.get(c.nome());
+        if (f == null) {
+            erro(c.linha(), c.coluna(), "função '" + c.nome() + "' não declarada");
+            return new Expr.Call(c.nome(), args, c.linha(), c.coluna());
+        }
+        if (args.size() != f.params().size()) {
+            erro(c.linha(), c.coluna(), "função '" + f.nome() + "' espera " + f.params().size()
+                    + " argumento(s), recebeu " + args.size());
+        } else {
+            for (int i = 0; i < args.size(); i++) {
+                Expr arg = args.get(i);
+                Type esperado = f.params().get(i);
+                int n = i + 1;
+                args.set(i, compativel(arg, esperado, arg.linha(), arg.coluna(),
+                        t -> "argumento " + n + " de '" + f.nome() + "': esperado " + esperado.nome()
+                                + ", encontrado " + t.nome()));
+            }
+        }
+        Expr.Call nova = new Expr.Call(c.nome(), args, c.linha(), c.coluna());
+        nova.setType(f.retorno()); // mesmo com erro nos argumentos: evita cascata
+        resolucao.registrar(nova, f);
+        return nova;
     }
 
     private Expr unaria(Expr.Unary u) {
@@ -277,7 +377,9 @@ public final class SemanticAnalyzer {
     private VarSymbol resolver(String nome, int linha, int coluna) {
         VarSymbol s = tabela.buscar(nome);
         if (s == null) {
-            erro(linha, coluna, "variável '" + nome + "' não declarada");
+            String dica = funcaoAtual != null && tabela.existeForaDaFuncao(nome)
+                    ? " (funções não acessam variáveis globais)" : "";
+            erro(linha, coluna, "variável '" + nome + "' não declarada" + dica);
         }
         return s;
     }

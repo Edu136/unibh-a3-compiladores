@@ -198,6 +198,90 @@ class SemanticTest {
         assertSemErros("var a: int; var b: float; var c: char; var d: string; input(a); input(b); input(c); input(d);");
     }
 
+    // ---------- funções ----------
+
+    @Test
+    @DisplayName("função chamada antes de declarada, com recursão")
+    void funcaoAntesDaDeclaracao() {
+        String a = arvore("print(f(3)); func f(n: int): int "
+                + "{ if (n <= 1) { return 1; } else { return n * f(n - 1); } }");
+        assertTrue(a.contains("Call f : int"), a);
+    }
+
+    @Test
+    @DisplayName("argumento e return com promoção int→float")
+    void promocaoEmArgumentoEReturn() {
+        assertContemLinhas(arvore("func g(x: float): float { return 1; } print(g(2));"),
+                "      Return",
+                "        Convert float",
+                "          IntLit 1 : int",
+                "  Print",
+                "    Call g : float",
+                "      Convert float",
+                "        IntLit 2 : int");
+    }
+
+    @Test
+    @DisplayName("funções e variáveis têm espaços de nomes separados")
+    void espacosDeNomes() {
+        assertSemErros("var f: int = 1; func f(): int { return 2; } print(f + f()); "
+                + "func n(n: int): int { return n; }");
+    }
+
+    @Test
+    @DisplayName("slots: globais e locais numerados por unidade, parâmetros primeiro")
+    void slots() {
+        Resultado r = analisar("var a: int = 1; func f(p: int): int { var q: int = p; return q; }");
+        assertEquals(List.of(), erros(r));
+
+        Stmt.VarDecl a = (Stmt.VarDecl) r.programa().itens().get(0);
+        var f = (br.unibh.macs.ast.FuncDecl) r.programa().itens().get(1);
+        Stmt.VarDecl q = (Stmt.VarDecl) f.corpo().stmts().get(0);
+
+        assertEquals(new VarSymbol("a", br.unibh.macs.ast.Type.INT, true, 0), r.resolucao().variavel(a));
+        VarSymbol p = r.resolucao().variavel(f.params().get(0));
+        assertEquals(new VarSymbol("p", br.unibh.macs.ast.Type.INT, false, 0), p);
+        assertEquals(new VarSymbol("q", br.unibh.macs.ast.Type.INT, false, 1), r.resolucao().variavel(q));
+        assertSame(p, r.resolucao().variavel(q.init()), "o uso de p resolve para o mesmo símbolo do parâmetro");
+    }
+
+    @Test
+    @DisplayName("a chamada fica ligada ao símbolo da função")
+    void resolucaoDeChamada() {
+        Resultado r = analisar("func f(): int { return 1; } print(f());");
+        Expr.Call call = (Expr.Call) ((Stmt.Print) r.programa().itens().get(1)).expr();
+        assertEquals("f", r.resolucao().funcao(call).nome());
+    }
+
+    static Stream<Arguments> funcoesInvalidas() {
+        return Stream.of(
+                Arguments.of("var g: int = 1; func f(): int { return g; }",
+                        "1:40 variável 'g' não declarada (funções não acessam variáveis globais)"),
+                Arguments.of("func f(): int { return 1; } func f(): int { return 2; }",
+                        "1:29 função 'f' já declarada"),
+                Arguments.of("func f(a: int, a: int): int { return a; }", "1:16 parâmetro 'a' repetido"),
+                Arguments.of("print(g(1));", "1:7 função 'g' não declarada"),
+                Arguments.of("func f(a: int): int { return a; } print(f(1, 2));",
+                        "1:41 função 'f' espera 1 argumento(s), recebeu 2"),
+                Arguments.of("func f(a: int): int { return a; } print(f(\"x\"));",
+                        "1:43 argumento 1 de 'f': esperado int, encontrado string"),
+                Arguments.of("return 1;", "1:1 return fora de função"),
+                Arguments.of("func f(): int { return \"a\"; }",
+                        "1:17 return incompatível: função 'f' retorna int, valor é string"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("funcoesInvalidas")
+    void funcaoInvalida(String fonte, String erro) {
+        assertErros(fonte, erro);
+    }
+
+    @Test
+    @DisplayName("argumentos de função inexistente também são verificados")
+    void argumentosDeFuncaoInexistente() {
+        assertErros("print(g(x));", "1:7 função 'g' não declarada", "1:9 variável 'x' não declarada");
+    }
+
     @Test
     @DisplayName("um erro não gera outros em cascata")
     void semCascata() {
