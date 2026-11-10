@@ -78,7 +78,47 @@ class MainTest {
     @Test
     void semArgumentos() {
         assertEquals(2, executar());
-        assertTrue(err().contains("uso: macsc <arquivo.macs> [--tokens] [--ast]"), err());
+        assertTrue(err().contains("uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe]"), err());
+    }
+
+    // ---------- geração de código ----------
+
+    @Test
+    @DisplayName("sem erros, o .asm é escrito ao lado do fonte (sem .exe)")
+    void escreveAsmAoLadoDoFonte() throws IOException {
+        String fonte = arquivo("ok.macs", "var x: int = 1; func f(): int { return 2; } print(x + f());");
+
+        assertEquals(0, executar(fonte), err());
+        Path asm = dir.resolve("ok.asm");
+        assertTrue(Files.exists(asm));
+        String conteudo = Files.readString(asm, StandardCharsets.UTF_8);
+        assertTrue(conteudo.contains("global _main"), conteudo);
+        assertTrue(conteudo.contains("fn_f:"), conteudo);
+        assertTrue(conteudo.contains("g_x_0"), conteudo);
+        assertFalse(Files.exists(dir.resolve("ok.exe")));
+    }
+
+    @Test
+    @DisplayName("com erro de compilação, nem .asm nem .exe são gerados")
+    void erroNaoGeraArquivos() throws IOException {
+        assertEquals(1, executar(arquivo("ruim.macs", "print(x);"), "--exe"));
+        assertFalse(Files.exists(dir.resolve("ruim.asm")));
+        assertFalse(Files.exists(dir.resolve("ruim.exe")));
+    }
+
+    @Test
+    @DisplayName("--exe gera um executável que roda")
+    void exeRoda() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(br.unibh.macs.codegen.Montador.disponivel(),
+                "nasm/gcc i686 não estão no PATH");
+        assertEquals(0, executar(arquivo("ok.macs", "print(1 + 1);"), "--exe"), err());
+
+        Path exe = dir.resolve("ok.exe");
+        assertTrue(Files.exists(exe));
+        Process p = new ProcessBuilder(exe.toString()).redirectErrorStream(true).start();
+        String saida = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        assertEquals(0, p.waitFor());
+        assertEquals("2", saida);
     }
 
     // ---------- fase sintática ----------

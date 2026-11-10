@@ -257,6 +257,7 @@ public final class CodeGenerator {
     /** input(x): a variável recebe o valor padrão antes (se a leitura falhar, fica com ele). */
     private void ler(VarSymbol s) {
         comentario("input " + s.nome() + " (" + s.tipo().nome() + ")");
+        emitir("call rt_pular_bom", "ignora BOM no início da entrada (só na 1ª leitura)");
         guardarPadrao(s);
         if (s.tipo() == Type.STRING) {
             emitir("push 256");
@@ -560,6 +561,7 @@ public final class CodeGenerator {
         asm.append("; Ligar:  gcc -m32 prog.obj -o prog.exe\n\n");
         asm.append("global _main\n");
         asm.append("extern _printf, _scanf, _sprintf, _malloc, _strlen, _strcpy, _strcat, _strcmp, _exit\n");
+        asm.append("extern _fgetc, _ungetc, ___iob_func\n");
         asm.append("extern _SetConsoleOutputCP@4, _SetConsoleCP@4\n\n");
 
         asm.append("section .data\n");

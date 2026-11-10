@@ -6,6 +6,10 @@ set "JAVA=java"
 if exist "C:\tools\jdk-21\bin\java.exe" set "JAVA=C:\tools\jdk-21\bin\java.exe"
 if defined MACSC_JAVA set "JAVA=%MACSC_JAVA%"
 
+rem --exe precisa de nasm e gcc i686; se existirem em C:\tools, entram no PATH so aqui.
+if exist "C:\tools\nasm\nasm.exe" set "PATH=C:\tools\nasm;%PATH%"
+if exist "C:\tools\mingw32\bin\gcc.exe" set "PATH=C:\tools\mingw32\bin;%PATH%"
+
 if not exist "%~dp0target\macsc.jar" (
     echo macsc.jar nao encontrado. Rode build.bat primeiro. 1>&2
     exit /b 2

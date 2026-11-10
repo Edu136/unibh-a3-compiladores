@@ -11,12 +11,13 @@ Trabalho A3 — Teoria da Computação e Compiladores — UniBH.
 | Análise léxica | `br.unibh.macs.lexer` | concluída |
 | Análise sintática | `br.unibh.macs.parser` (árvore em `br.unibh.macs.ast`) | concluída |
 | Análise semântica | `br.unibh.macs.semantic` | concluída |
-| Geração de código | `br.unibh.macs.codegen` | — |
+| Geração de código | `br.unibh.macs.codegen` | concluída |
 
 ## Requisitos
 
 - JDK 21
 - Maven 3.9+
+- Para gerar o executável (`--exe`): [NASM](https://www.nasm.us/) e o `gcc` do **MinGW-w64 i686** (32 bits) no PATH. O `macsc.bat` e o `build.bat` usam automaticamente `C:\tools\nasm` e `C:\tools\mingw32\bin` se essas pastas existirem.
 
 ## Compilar
 
@@ -29,15 +30,21 @@ Gera `target\macsc.jar` e roda os testes. O `build.bat` usa o JDK indicado em `M
 ## Usar
 
 ```bat
-macsc.bat programa.macs [--tokens] [--ast]
+macsc.bat programa.macs [--tokens] [--ast] [--exe]
 ```
 
 | Opção | Efeito |
 |---|---|
 | `--tokens` | imprime a lista de tokens (`linha:coluna  TIPO  lexema`) |
 | `--ast` | imprime a árvore sintática anotada com os tipos |
+| `--exe` | além do `.asm`, monta e liga o executável `programa.exe` |
 
-Sem opções, o programa passa pelas análises léxica, sintática e semântica, e só os erros são mostrados.
+Se não houver erros, o compilador grava `programa.asm` (NASM, x86 32 bits) na mesma pasta do fonte. Com `--exe`, também gera `programa.exe`:
+
+```bat
+macsc.bat fatorial.macs --exe
+fatorial.exe
+```
 
 O `macsc.bat` usa o Java indicado em `MACSC_JAVA`, se definido.
 
@@ -161,3 +168,35 @@ erros.macs:11:5: erro semântico: condição do if deve ser bool, encontrado int
 | 2 | erro de uso ou de arquivo |
 
 Erros são impressos como `arquivo:linha:coluna: erro <fase>: mensagem`.
+
+## Geração de código
+
+Gera assembly NASM x86 (32 bits) para Windows, ligado com a biblioteca C do Windows (msvcrt). Sem código intermediário e sem otimização.
+
+**Modelo**
+- O resultado de cada expressão fica em `eax` (int, bool, char e ponteiro de string) ou em `xmm0` (float, como double em SSE2). Nas operações binárias, o lado esquerdo é guardado na pilha enquanto o direito é calculado.
+- Cada variável ocupa 8 bytes: as globais em `.bss` (`g_nome_slot`), e os parâmetros e as locais na pilha (`[ebp+...]` / `[ebp-...]`).
+- Funções (`fn_nome`): os argumentos são calculados e empilhados da esquerda para a direita, 8 bytes cada, e quem chama limpa a pilha. O retorno vem em `eax`, ou em `xmm0` para float.
+- `char` guarda o código Unicode e é impresso em UTF-8. `bool` é 0/1 e é impresso como `true`/`false`.
+- Strings são `char*` terminados em 0. A concatenação aloca memória nova (`malloc`), que não é liberada.
+
+**Execução**
+- `print` imprime o valor e pula linha. Float sai com 6 casas (`2.500000`).
+- `input` lê do teclado. Para string, lê a linha inteira, com espaços e acentos. Para char, lê um caractere ASCII. Se a leitura falhar, a variável fica com o valor padrão.
+- `&&` e `||` só avaliam o lado direito quando é preciso.
+- `/` e `%` entre inteiros seguem C e Java: truncam em direção a zero, e o resto tem o sinal do dividendo. Divisão ou resto por zero interrompe o programa com `erro de execução: divisão por zero (linha L)` e código 1.
+- Inteiros têm 32 bits e estouram em silêncio, como em C e Java: `2147483647 + 1` dá `-2147483648`.
+
+Exemplo, com o fatorial e a entrada `5`:
+
+```text
+> macsc.bat fatorial.macs --exe
+> fatorial.exe
+Digite um número: 
+5
+Fatorial de 1 = 1
+Fatorial de 2 = 2
+Fatorial de 3 = 6
+Fatorial de 4 = 24
+Fatorial de 5 = 120
+```

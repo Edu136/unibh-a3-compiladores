@@ -49,6 +49,19 @@ class CodeGenE2ETest {
     }
 
     @Test
+    void programaFatorial() throws Exception {
+        String fonte;
+        try (var in = CodeGenE2ETest.class.getResourceAsStream("/fatorial.macs")) {
+            fonte = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        verificar(fonte, "5\n",
+                "Digite um número: \n"
+                        + "Fatorial de 1 = 1\nFatorial de 2 = 2\nFatorial de 3 = 6\n"
+                        + "Fatorial de 4 = 24\nFatorial de 5 = 120\n",
+                0);
+    }
+
+    @Test
     void asmTemEstruturaBasica() {
         String asm = E2E.asm("print(1);");
         assertTrue(asm.contains("global _main"), asm);
@@ -142,7 +155,12 @@ class CodeGenE2ETest {
                 caso("print(\"a`b\");", "a`b\n"),
                 caso("func saud(n: string): string { return \"Olá, \" + n; } print(saud(\"Ana\"));", "Olá, Ana\n"),
                 caso("var a: string = \"x\"; var b: string = a; a = a + \"y\"; print(a); print(b); "
-                        + "print('\\n' == '\\n'); print(\"\" == \"\");", "xy\nx\ntrue\ntrue\n"));
+                        + "print('\\n' == '\\n'); print(\"\" == \"\");", "xy\nx\ntrue\ntrue\n"),
+
+                // ---- entrada com BOM (pipe do PowerShell 5.1 envia EF BB BF antes do texto) ----
+                caso("var n: int; input(n); print(n); var s: string; input(s); print(s);",
+                        "﻿42\nolá\n", "42\nolá\n", 0),
+                caso("var s: string; input(s); print(s);", "﻿São Paulo\n", "São Paulo\n", 0));
     }
 
     @ParameterizedTest(name = "{0}")

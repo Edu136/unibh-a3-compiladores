@@ -25,6 +25,7 @@ final class Runtime {
             str_true        db `true`, 0
             str_false       db `false`, 0
             str_vazia       db 0
+            bom_verificado  db 0
             """;
 
     /** Seção .text: rotinas do runtime. */
@@ -140,6 +141,39 @@ final class Runtime {
                 or dl, 0x80
                 mov [eax+2], dl
                 mov byte [eax+3], 0
+                ret
+
+            ; void rt_pular_bom(): só na primeira leitura, descarta um BOM UTF-8 (EF BB BF) no início
+            ; da entrada (o pipe do PowerShell 5.1 envia um). Feito na primeira leitura, e não no início
+            ; do programa, para não esperar o teclado antes de o prompt aparecer.
+            rt_pular_bom:
+                cmp byte [bom_verificado], 0
+                jne .fim
+                mov byte [bom_verificado], 1
+                call ___iob_func            ; função C __iob_func(): &_iob[0] = stdin
+                push eax                    ; [esp] = stdin
+                push eax
+                call _fgetc
+                add esp, 4
+                cmp eax, 0xEF
+                je .bom
+                cmp eax, -1                 ; EOF: nada a devolver
+                je .sai
+                push dword [esp]            ; stdin
+                push eax
+                call _ungetc                ; não era BOM: devolve o caractere
+                add esp, 8
+                jmp .sai
+            .bom:
+                push dword [esp]
+                call _fgetc                 ; BB
+                add esp, 4
+                push dword [esp]
+                call _fgetc                 ; BF
+                add esp, 4
+            .sai:
+                add esp, 4
+            .fim:
                 ret
 
             ; void rt_div_zero(int linha): mensagem e encerra com código 1.

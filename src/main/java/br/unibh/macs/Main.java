@@ -1,6 +1,8 @@
 package br.unibh.macs;
 
 import br.unibh.macs.ast.AstPrinter;
+import br.unibh.macs.codegen.CodeGenerator;
+import br.unibh.macs.codegen.Montador;
 import br.unibh.macs.ast.Program;
 import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Lexer;
@@ -28,7 +30,7 @@ public final class Main {
     static final int ERRO_COMPILACAO = 1;
     static final int ERRO_USO = 2;
 
-    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast]";
+    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe]";
     private static final char BOM = '﻿';
     private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
 
@@ -65,12 +67,15 @@ public final class Main {
         String arquivo = null;
         boolean mostrarTokens = false;
         boolean mostrarAst = false;
+        boolean gerarExe = false;
 
         for (String arg : args) {
             if (arg.equals("--tokens")) {
                 mostrarTokens = true;
             } else if (arg.equals("--ast")) {
                 mostrarAst = true;
+            } else if (arg.equals("--exe")) {
+                gerarExe = true;
             } else if (arg.startsWith("--")) {
                 err.println("opção desconhecida: " + arg);
                 err.println(USO);
@@ -87,9 +92,11 @@ public final class Main {
             return ERRO_USO;
         }
 
+        Path caminho;
         String fonte;
         try {
-            fonte = lerFonte(Path.of(arquivo));
+            caminho = Path.of(arquivo);
+            fonte = lerFonte(caminho);
         } catch (InvalidPathException e) {
             err.println("caminho de arquivo inválido: " + arquivo);
             return ERRO_USO;
@@ -118,7 +125,8 @@ public final class Main {
                 // println linha a linha: mesmo fim de linha do sistema que o --tokens
                 AstPrinter.imprimir(semantico.programa()).lines().forEach(out::println);
             }
-            return SUCESSO;
+            String asm = CodeGenerator.gerar(semantico.programa(), semantico.resolucao());
+            return escreverSaidas(caminho, asm, gerarExe, err);
         } catch (CompileError e) {
             err.println(e.formatar(arquivo));
             return ERRO_COMPILACAO;
@@ -132,6 +140,38 @@ public final class Main {
             err.println(arquivo + ": erro: programa grande demais para compilar");
             return ERRO_COMPILACAO;
         }
+    }
+
+    /**
+     * Grava {@code prog.asm} ao lado do fonte e, com --exe, monta e liga {@code prog.exe}.
+     * Ferramenta ausente é erro de ambiente (código 2); o .asm continua gravado.
+     */
+    private static int escreverSaidas(Path fonte, String asm, boolean gerarExe, PrintStream err) {
+        Path arquivoAsm = comExtensao(fonte, ".asm");
+        try {
+            Files.writeString(arquivoAsm, asm, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            err.println("não foi possível gravar " + arquivoAsm + ": " + e.getMessage());
+            return ERRO_USO;
+        }
+        if (!gerarExe) {
+            return SUCESSO;
+        }
+        try {
+            new Montador().gerarExe(arquivoAsm, comExtensao(fonte, ".exe"));
+            return SUCESSO;
+        } catch (Montador.FalhaMontagem e) {
+            err.println("macsc: " + e.getMessage());
+            return e.ferramentaAusente() ? ERRO_USO : ERRO_COMPILACAO;
+        }
+    }
+
+    /** {@code pasta/prog.macs} → {@code pasta/prog<extensao>}. */
+    private static Path comExtensao(Path fonte, String extensao) {
+        String nome = fonte.getFileName().toString();
+        int ponto = nome.lastIndexOf('.');
+        String base = ponto > 0 ? nome.substring(0, ponto) : nome;
+        return fonte.resolveSibling(base + extensao);
     }
 
     /**
