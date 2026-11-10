@@ -1,44 +1,40 @@
 Program
   FuncDecl fatorial(n: int): int
     Block
-      If
-        Binary <= : bool
-          Var n : int
-          IntLit 1 : int
-        Block
-          Return
-            IntLit 1 : int
-      Return
-        Binary * : int
-          Var n : int
-          Call fatorial : int
-            Binary - : int
-              Var n : int
-              IntLit 1 : int
-  VarDecl numero: int
-  Print
-    StringLit "Digite um número: " : string
-  Input numero
-  For
-    Init
-      VarDecl i: int
+      VarDecl resultado: int
         IntLit 1 : int
-    Cond
-      Binary <= : bool
-        Var i : int
-        Var numero : int
-    Passo
-      Assign i
-        Binary + : int
-          Var i : int
-          IntLit 1 : int
-    Block
-      Print
-        Binary + : string
-          Binary + : string
-            Binary + : string
-              StringLit "Fatorial de " : string
-              Var i : int
-            StringLit " = " : string
-          Call fatorial : int
+      For
+        Init
+          VarDecl i: int
+            IntLit 1 : int
+        Cond
+          Binary <= : bool
             Var i : int
+            Var n : int
+        Passo
+          Assign i
+            Binary + : int
+              Var i : int
+              IntLit 1 : int
+        Block
+          Assign resultado
+            Binary * : int
+              Var resultado : int
+              Var i : int
+      Return
+        Var resultado : int
+  Print
+    StringLit "Digite um número para calcular o fatorial:" : string
+  VarDecl numero: int
+  Input numero
+  VarDecl fat: int
+    Call fatorial : int
+      Var numero : int
+  Print
+    Binary + : string
+      Binary + : string
+        Binary + : string
+          StringLit "O fatorial de " : string
+          Var numero : int
+        StringLit " é " : string
+      Var fat : int

@@ -55,9 +55,8 @@ class CodeGenE2ETest {
             fonte = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         }
         verificar(fonte, "5\n",
-                "Digite um número: \n"
-                        + "Fatorial de 1 = 1\nFatorial de 2 = 2\nFatorial de 3 = 6\n"
-                        + "Fatorial de 4 = 24\nFatorial de 5 = 120\n",
+                "Digite um número para calcular o fatorial:\n"
+                        + "O fatorial de 5 é 120\n",
                 0);
     }
 
