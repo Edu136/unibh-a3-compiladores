@@ -106,7 +106,23 @@ public final class SemanticAnalyzer {
         tabela.sairFuncao();
         funcaoAtual = null;
         Stmt.Block novoCorpo = new Stmt.Block(corpo, f.corpo().linha(), f.corpo().coluna());
+        if (!retornaSempre(novoCorpo)) {
+            erro(f.linha(), f.coluna(), "função '" + f.nome() + "' pode terminar sem return");
+        }
         return new FuncDecl(f.nome(), f.params(), f.retorno(), novoCorpo, f.linha(), f.coluna());
+    }
+
+    /**
+     * Regra conservadora: um bloco retorna se algum comando dele retorna; um if só retorna se
+     * tiver else e os dois ramos retornarem; while e for nunca garantem retorno.
+     */
+    private static boolean retornaSempre(Stmt s) {
+        return switch (s) {
+            case Stmt.Return r -> true;
+            case Stmt.Block b -> b.stmts().stream().anyMatch(SemanticAnalyzer::retornaSempre);
+            case Stmt.If i -> i.senao() != null && retornaSempre(i.entao()) && retornaSempre(i.senao());
+            default -> false;
+        };
     }
 
     // ---------- comandos ----------

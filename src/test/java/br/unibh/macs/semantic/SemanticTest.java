@@ -282,6 +282,46 @@ class SemanticTest {
         assertErros("print(g(x));", "1:7 função 'g' não declarada", "1:9 variável 'x' não declarada");
     }
 
+    // ---------- todo caminho retorna ----------
+
+    @ParameterizedTest(name = "{0}")
+    @DisplayName("funções que sempre retornam")
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "func a(n: int): int { if (n > 0) { return 1; } else { return 2; } }",
+            "func b(): int { { return 1; } }",
+            "func c(): int { while (true) { } return 0; }",
+            "func d(n: int): int { if (n > 0) { return 1; } else if (n < 0) { return 2; } else { return 3; } }"})
+    void sempreRetorna(String fonte) {
+        assertSemErros(fonte);
+    }
+
+    @Test
+    @DisplayName("if sem else não garante retorno")
+    void ifSemElse() {
+        assertErros("func f(n: int): int { if (n > 0) { return 1; } }", "1:1 função 'f' pode terminar sem return");
+    }
+
+    @Test
+    @DisplayName("while não garante retorno")
+    void returnSoDentroDoWhile() {
+        assertErros("func f(): int { while (true) { return 1; } }", "1:1 função 'f' pode terminar sem return");
+    }
+
+    // ---------- acúmulo e ordem ----------
+
+    @Test
+    @DisplayName("vários erros são reportados, em ordem")
+    void variosErros() {
+        assertErros("print(a); print(b);", "1:7 variável 'a' não declarada", "1:17 variável 'b' não declarada");
+    }
+
+    @Test
+    @DisplayName("erros de função e do código global ficam em ordem de posição")
+    void ordemEntreFuncaoEGlobal() {
+        assertErros("func f(): int { return b; } print(a);",
+                "1:24 variável 'b' não declarada", "1:35 variável 'a' não declarada");
+    }
+
     @Test
     @DisplayName("um erro não gera outros em cascata")
     void semCascata() {
