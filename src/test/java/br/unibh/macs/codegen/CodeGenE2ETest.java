@@ -89,7 +89,27 @@ class CodeGenE2ETest {
                 caso("for (var i: int = 0; i < 3; i = i + 1) { for (var j: int = 0; j < 2; j = j + 1) "
                         + "{ print(i * 10 + j); } }",
                         "0\n1\n10\n11\n20\n21\n"),
-                caso("while (false) { print(1); } print(2);", "2\n"));
+                caso("while (false) { print(1); } print(2);", "2\n"),
+
+                // ---- funções ----
+                caso("func sub(a: int, b: int): int { return a - b; } print(sub(10, 3));", "7\n"),
+                caso("func fat(n: int): int { if (n <= 1) { return 1; } return n * fat(n - 1); } "
+                        + "func fib(n: int): int { if (n < 2) { return n; } return fib(n - 1) + fib(n - 2); } "
+                        + "print(fat(5)); print(fib(10));",
+                        "120\n55\n"),
+                caso("mostra(7); func mostra(n: int): int { print(n); return 0; }", "7\n"),
+                caso("func soma(a: int, b: int): int { return a + b; } "
+                        + "print(soma(soma(1, 2), soma(3, 4)) * 2);", "20\n"),
+                caso("func f(): bool { print(99); return true; } print(false && f()); print(true || f());",
+                        "false\ntrue\n"),
+                caso("func g(a: int, b: int, c: int): int { var x: int = a * 100; var y: int = b * 10; "
+                        + "return x + y + c; } print(g(1, 2, 3));", "123\n"),
+                caso("func d(n: int): int { return 10 / n; }\nprint(d(0));", "",
+                        "erro de execução: divisão por zero (linha 1)\n", 1),
+                caso("func eh(n: int): bool { return n > 0; } if (eh(5)) { print(1); }", "1\n"),
+                caso("func conta(n: int): int { var s: int = 0; for (var i: int = 1; i <= n; i = i + 1) "
+                        + "{ var q: int = i * i; s = s + q; } return s; } print(conta(3)); print(conta(4));",
+                        "14\n30\n"));
     }
 
     @ParameterizedTest(name = "{0}")

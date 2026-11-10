@@ -28,6 +28,10 @@ public final class CodeGenerator {
     private final Set<String> globais = new LinkedHashSet<>();
     private int proximoRotulo = 0;
 
+    // função sendo gerada (null = código global, em _main)
+    private FuncDecl funcaoAtual = null;
+    private int numParams = 0;
+
     private CodeGenerator(Resolucao resolucao) {
         this.resolucao = resolucao;
     }
@@ -38,6 +42,15 @@ public final class CodeGenerator {
     }
 
     private String executar(Program programa) {
+        // funções MACSLang
+        for (Item item : programa.itens()) {
+            if (item instanceof FuncDecl f) {
+                funcao(f);
+            }
+        }
+
+        // código global, na ordem do arquivo
+        text.append("\n; ---------------- programa principal ----------------\n");
         rotulo("_main");
         emitir("push ebp");
         emitir("mov ebp, esp");
@@ -48,8 +61,6 @@ public final class CodeGenerator {
         for (Item item : programa.itens()) {
             if (item instanceof Stmt s) {
                 stmt(s);
-            } else {
-                throw naoSuportado((FuncDecl) item);
             }
         }
         emitir("xor eax, eax", "return 0");
@@ -58,6 +69,76 @@ public final class CodeGenerator {
         emitir("ret");
 
         return montarArquivo();
+    }
+
+    // ---------- funções ----------
+
+    /**
+     * Quadro: [ebp+8+8*(n-1-i)] = parâmetro i (empilhados da esquerda para a direita),
+     * [ebp-8*(k-n+1)] = local de slot k. Retorno em eax (ou xmm0 para float).
+     */
+    private void funcao(FuncDecl f) {
+        funcaoAtual = f;
+        numParams = f.params().size();
+        int locais = contarDeclaracoes(f.corpo());
+
+        String params = f.params().stream().map(p -> p.nome() + ": " + p.tipo().nome())
+                .collect(java.util.stream.Collectors.joining(", "));
+        text.append("\n; func ").append(f.nome()).append('(').append(params).append("): ")
+                .append(f.retorno().nome()).append('\n');
+        rotulo(rotuloFuncao(f.nome()));
+        emitir("push ebp");
+        emitir("mov ebp, esp");
+        if (locais > 0) {
+            emitir("sub esp, " + (8 * locais), locais + " variável(is) local(is) de 8 bytes");
+        }
+        stmt(f.corpo());
+        rotulo(rotuloFim(f));
+        emitir("mov esp, ebp");
+        emitir("pop ebp");
+        emitir("ret");
+
+        funcaoAtual = null;
+        numParams = 0;
+    }
+
+    /** Quantidade de declarações de variável no corpo (cada uma tem seu slot). */
+    private static int contarDeclaracoes(Stmt s) {
+        return switch (s) {
+            case Stmt.VarDecl d -> 1;
+            case Stmt.Block b -> b.stmts().stream().mapToInt(CodeGenerator::contarDeclaracoes).sum();
+            case Stmt.If i -> contarDeclaracoes(i.entao()) + (i.senao() == null ? 0 : contarDeclaracoes(i.senao()));
+            case Stmt.While w -> contarDeclaracoes(w.corpo());
+            case Stmt.For f -> (f.init() == null ? 0 : contarDeclaracoes(f.init())) + contarDeclaracoes(f.corpo());
+            default -> 0;
+        };
+    }
+
+    private static String rotuloFuncao(String nome) {
+        return "fn_" + nome;
+    }
+
+    private static String rotuloFim(FuncDecl f) {
+        return "fn_" + f.nome() + "_fim";
+    }
+
+    /** Argumentos da esquerda para a direita, 8 bytes cada; quem chama limpa a pilha. */
+    private void chamada(Expr.Call c) {
+        comentario("chamada " + c.nome() + "(" + c.args().size() + " argumento(s))");
+        for (Expr arg : c.args()) {
+            expr(arg);
+            empilhar(arg.getType());
+        }
+        emitir("call " + rotuloFuncao(c.nome()));
+        if (!c.args().isEmpty()) {
+            emitir("add esp, " + (8 * c.args().size()), "descarta os argumentos");
+        }
+    }
+
+    /** Empilha o valor atual (eax ou xmm0) ocupando 8 bytes. */
+    private void empilhar(Type tipo) {
+        emitir("sub esp, 8");
+        emitir("mov dword [esp], eax");
     }
 
     // ---------- comandos ----------
@@ -81,6 +162,12 @@ public final class CodeGenerator {
             }
             case Stmt.Print p -> imprimir(p.expr());
             case Stmt.Block b -> b.stmts().forEach(this::stmt);
+            case Stmt.CallStmt c -> chamada(c.call()); // valor de retorno descartado
+            case Stmt.Return r -> {
+                comentario("return");
+                expr(r.expr());
+                emitir("jmp " + rotuloFim(funcaoAtual));
+            }
             case Stmt.If i -> {
                 String senao = novoRotulo();
                 String fim = novoRotulo();
@@ -166,6 +253,7 @@ public final class CodeGenerator {
                 }
             }
             case Expr.Binary b -> binaria(b);
+            case Expr.Call c -> chamada(c);
             default -> throw naoSuportado(expr);
         }
     }
@@ -249,7 +337,10 @@ public final class CodeGenerator {
             globais.add(nome);
             return nome;
         }
-        throw new IllegalStateException("variáveis locais ainda não suportadas: " + s.nome());
+        if (s.slot() < numParams) {
+            return "ebp+" + (8 + 8 * (numParams - 1 - s.slot())); // parâmetro
+        }
+        return "ebp-" + (8 * (s.slot() - numParams + 1)); // local
     }
 
     private void carregar(VarSymbol s) {
