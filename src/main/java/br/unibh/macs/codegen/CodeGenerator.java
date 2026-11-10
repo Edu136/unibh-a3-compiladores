@@ -80,6 +80,54 @@ public final class CodeGenerator {
                 guardar(resolucao.variavel(a));
             }
             case Stmt.Print p -> imprimir(p.expr());
+            case Stmt.Block b -> b.stmts().forEach(this::stmt);
+            case Stmt.If i -> {
+                String senao = novoRotulo();
+                String fim = novoRotulo();
+                comentario("if");
+                expr(i.cond());
+                emitir("test eax, eax");
+                emitir("jz " + senao, "condição falsa");
+                stmt(i.entao());
+                emitir("jmp " + fim);
+                rotulo(senao);
+                if (i.senao() != null) {
+                    stmt(i.senao());
+                }
+                rotulo(fim);
+            }
+            case Stmt.While w -> {
+                String inicio = novoRotulo();
+                String fim = novoRotulo();
+                comentario("while");
+                rotulo(inicio);
+                expr(w.cond());
+                emitir("test eax, eax");
+                emitir("jz " + fim, "sai do laço");
+                stmt(w.corpo());
+                emitir("jmp " + inicio);
+                rotulo(fim);
+            }
+            case Stmt.For f -> {
+                String inicio = novoRotulo();
+                String fim = novoRotulo();
+                comentario("for");
+                if (f.init() != null) {
+                    stmt(f.init());
+                }
+                rotulo(inicio);
+                if (f.cond() != null) {
+                    expr(f.cond());
+                    emitir("test eax, eax");
+                    emitir("jz " + fim, "sai do laço");
+                }
+                stmt(f.corpo());
+                if (f.passo() != null) {
+                    stmt(f.passo());
+                }
+                emitir("jmp " + inicio);
+                rotulo(fim);
+            }
             default -> throw naoSuportado(stmt);
         }
     }

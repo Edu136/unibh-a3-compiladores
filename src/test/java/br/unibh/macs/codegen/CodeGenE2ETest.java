@@ -72,7 +72,24 @@ class CodeGenE2ETest {
                 caso("var z: int = 0;\nprint(1);\nprint(10 / z);", "",
                         "1\nerro de execução: divisão por zero (linha 3)\n", 1),
                 caso("var z: int = 0; print(5 % z);", "", "erro de execução: divisão por zero (linha 1)\n", 1),
-                caso("print(5 > 3 == true); print(1 >= 1); print(2 > 1 && 3 > 2 || false);", "true\ntrue\ntrue\n"));
+                caso("print(5 > 3 == true); print(1 >= 1); print(2 > 1 && 3 > 2 || false);", "true\ntrue\ntrue\n"),
+
+                // ---- controle de fluxo ----
+                caso("var x: int = 5; "
+                        + "if (x > 3) { print(1); } else if (x > 0) { print(2); } else { print(3); } x = 1; "
+                        + "if (x > 3) { print(1); } else if (x > 0) { print(2); } else { print(3); } x = -1; "
+                        + "if (x > 3) { print(1); } else if (x > 0) { print(2); } else { print(3); } "
+                        + "if (x > 0) { print(4); }",
+                        "1\n2\n3\n"),
+                caso("var i: int = 1; var s: int = 0; while (i <= 10) { s = s + i; i = i + 1; } print(s);", "55\n"),
+                caso("for (var i: int = 0; i < 3; i = i + 1) { print(i); }", "0\n1\n2\n"),
+                caso("var i: int = 0; for (; i < 3; ) { print(i); i = i + 1; }", "0\n1\n2\n"),
+                caso("var x: int = 1; { var x: int = 2; print(x); } print(x);", "2\n1\n"),
+                caso("for (var i: int = 0; i < 2; i = i + 1) { var s: int; print(s); s = 9; }", "0\n0\n"),
+                caso("for (var i: int = 0; i < 3; i = i + 1) { for (var j: int = 0; j < 2; j = j + 1) "
+                        + "{ print(i * 10 + j); } }",
+                        "0\n1\n10\n11\n20\n21\n"),
+                caso("while (false) { print(1); } print(2);", "2\n"));
     }
 
     @ParameterizedTest(name = "{0}")
