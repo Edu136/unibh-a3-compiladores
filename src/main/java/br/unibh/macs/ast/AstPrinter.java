@@ -98,28 +98,37 @@ public final class AstPrinter {
 
     private void expr(int nivel, Expr expr) {
         switch (expr) {
-            case Expr.IntLit i -> linha(nivel, "IntLit " + i.valor());
-            case Expr.FloatLit f -> linha(nivel, "FloatLit " + f.valor());
-            case Expr.CharLit c -> linha(nivel, "CharLit '" + escapar(String.valueOf(c.valor()), '\'') + "'");
-            case Expr.StringLit s -> linha(nivel, "StringLit \"" + escapar(s.valor(), '"') + "\"");
-            case Expr.BoolLit b -> linha(nivel, "BoolLit " + b.valor());
-            case Expr.Var v -> linha(nivel, "Var " + v.nome());
+            case Expr.IntLit i -> linha(nivel, tipado(expr, "IntLit " + i.valor()));
+            case Expr.FloatLit f -> linha(nivel, tipado(expr, "FloatLit " + f.valor()));
+            case Expr.CharLit c -> linha(nivel, tipado(expr, "CharLit '" + escapar(String.valueOf(c.valor()), '\'') + "'"));
+            case Expr.StringLit s -> linha(nivel, tipado(expr, "StringLit \"" + escapar(s.valor(), '"') + "\""));
+            case Expr.BoolLit b -> linha(nivel, tipado(expr, "BoolLit " + b.valor()));
+            case Expr.Var v -> linha(nivel, tipado(expr, "Var " + v.nome()));
             case Expr.Unary u -> {
-                linha(nivel, "Unary " + u.op().simbolo());
+                linha(nivel, tipado(expr, "Unary " + u.op().simbolo()));
                 expr(nivel + 1, u.operando());
             }
             case Expr.Binary b -> {
-                linha(nivel, "Binary " + b.op().simbolo());
+                linha(nivel, tipado(expr, "Binary " + b.op().simbolo()));
                 expr(nivel + 1, b.esq());
                 expr(nivel + 1, b.dir());
             }
+            case Expr.Convert c -> {
+                linha(nivel, "Convert " + c.alvo().nome());
+                expr(nivel + 1, c.expr());
+            }
             case Expr.Call c -> {
-                linha(nivel, "Call " + c.nome());
+                linha(nivel, tipado(expr, "Call " + c.nome()));
                 for (Expr arg : c.args()) {
                     expr(nivel + 1, arg);
                 }
             }
         }
+    }
+
+    /** Acrescenta " : tipo" quando o semântico já anotou a expressão. */
+    private static String tipado(Expr expr, String texto) {
+        return expr.getType() == null ? texto : texto + " : " + expr.getType().nome();
     }
 
     /** Reescreve caracteres especiais como no código-fonte (\n, \t, \\, \0 e a aspa delimitadora). */

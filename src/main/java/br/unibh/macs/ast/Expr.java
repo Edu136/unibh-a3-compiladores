@@ -162,6 +162,30 @@ public abstract sealed class Expr {
         }
     }
 
+    /**
+     * Conversão implícita inserida pelo analisador semântico (na v1, só int → float).
+     * Não existe no código-fonte: fica na posição da expressão convertida.
+     */
+    public static final class Convert extends Expr {
+        private final Expr expr;
+        private final Type alvo;
+
+        public Convert(Expr expr, Type alvo) {
+            super(expr.linha(), expr.coluna());
+            this.expr = expr;
+            this.alvo = alvo;
+            setType(alvo);
+        }
+
+        public Expr expr() {
+            return expr;
+        }
+
+        public Type alvo() {
+            return alvo;
+        }
+    }
+
     /** Chamada de função {@code nome(args)}. Posição: a do nome. */
     public static final class Call extends Expr {
         private final String nome;
