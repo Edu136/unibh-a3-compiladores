@@ -157,6 +157,14 @@ class CodeGenE2ETest {
                 caso("var a: string = \"x\"; var b: string = a; a = a + \"y\"; print(a); print(b); "
                         + "print('\\n' == '\\n'); print(\"\" == \"\");", "xy\nx\ntrue\ntrue\n"),
 
+                // ---- adicionados no /review ----
+                // rótulo do fim de f (era fn_f_fim) colidia com a função f_fim
+                caso("func f(): int { return 1; } func f_fim(): int { return 2; } print(f() + f_fim());", "3\n"),
+                // idiv com INT_MIN / -1 dava exceção de hardware (programa morria sem saída); Java dá INT_MIN e 0
+                caso("var m: int = -2147483647 - 1; print(m); var d: int = -1; print(m / d); print(m % d); "
+                        + "print(7 / d); print(7 % d);",
+                        "-2147483648\n-2147483648\n0\n-7\n0\n"),
+
                 // ---- entrada com BOM (pipe do PowerShell 5.1 envia EF BB BF antes do texto) ----
                 caso("var n: int; input(n); print(n); var s: string; input(s); print(s);",
                         "﻿42\nolá\n", "42\nolá\n", 0),

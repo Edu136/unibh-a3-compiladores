@@ -37,7 +37,8 @@ final class E2E {
     }
 
     static Execucao executar(String fonte, String stdin) throws Exception {
-        Path dir = Files.createTempDirectory("macsc-e2e");
+        // nome com espaço de propósito: a pasta do projeto também tem ("Trabalho - copiladores")
+        Path dir = Files.createTempDirectory("macsc e2e ");
         Path asm = dir.resolve("prog.asm");
         Path exe = dir.resolve("prog.exe");
         Files.writeString(asm, asm(fonte), StandardCharsets.UTF_8);

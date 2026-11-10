@@ -121,8 +121,12 @@ public final class CodeGenerator {
         return "fn_" + nome;
     }
 
+    /**
+     * Rótulo do epílogo. Usa '@', que não existe em identificadores MACSLang: com "_fim", a
+     * função f colidia com uma função chamada f_fim (fn_f_fim).
+     */
     private static String rotuloFim(FuncDecl f) {
-        return "fn_" + f.nome() + "_fim";
+        return "fn_" + f.nome() + "@fim";
     }
 
     /** Argumentos da esquerda para a direita, 8 bytes cada; quem chama limpa a pilha. */
@@ -352,11 +356,21 @@ public final class CodeGenerator {
             case MUL -> emitir("imul eax, ecx");
             case DIV, MOD -> {
                 verificarDivisaoPorZero(b.linha());
+                // divisor -1 tratado à parte: idiv de -2147483648 por -1 estoura (exceção de hardware).
+                // Como em Java: x / -1 = -x (com estouro silencioso) e x % -1 = 0.
+                String normal = novoRotulo();
+                String fim = novoRotulo();
+                emitir("cmp ecx, -1");
+                emitir("jne " + normal);
+                emitir(b.op() == BinaryOp.DIV ? "neg eax" : "xor eax, eax", "divisor -1");
+                emitir("jmp " + fim);
+                rotulo(normal);
                 emitir("cdq", "estende o sinal de eax para edx");
                 emitir("idiv ecx", "quociente em eax, resto em edx");
                 if (b.op() == BinaryOp.MOD) {
                     emitir("mov eax, edx");
                 }
+                rotulo(fim);
             }
             case EQ -> comparar("sete");
             case NE -> comparar("setne");
