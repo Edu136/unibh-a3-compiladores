@@ -277,6 +277,13 @@ class SemanticTest {
     }
 
     @Test
+    @DisplayName("parâmetros e corpo da função compartilham o escopo")
+    void parametroRedeclaradoNoCorpo() {
+        assertErros("func f(a: int): int { var a: int; return a; }",
+                "1:23 variável 'a' já declarada neste escopo");
+    }
+
+    @Test
     @DisplayName("argumentos de função inexistente também são verificados")
     void argumentosDeFuncaoInexistente() {
         assertErros("print(g(x));", "1:7 função 'g' não declarada", "1:9 variável 'x' não declarada");
