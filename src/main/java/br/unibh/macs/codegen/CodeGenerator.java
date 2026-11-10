@@ -25,7 +25,9 @@ public final class CodeGenerator {
 
     private final Resolucao resolucao;
     private final StringBuilder text = new StringBuilder();
+    private final StringBuilder constantes = new StringBuilder(); // .data do programa (floats, strings)
     private final Set<String> globais = new LinkedHashSet<>();
+    private final java.util.Map<Long, String> floats = new java.util.HashMap<>();
     private int proximoRotulo = 0;
 
     // função sendo gerada (null = código global, em _main)
@@ -138,7 +140,11 @@ public final class CodeGenerator {
     /** Empilha o valor atual (eax ou xmm0) ocupando 8 bytes. */
     private void empilhar(Type tipo) {
         emitir("sub esp, 8");
-        emitir("mov dword [esp], eax");
+        if (tipo == Type.FLOAT) {
+            emitir("movsd qword [esp], xmm0");
+        } else {
+            emitir("mov dword [esp], eax");
+        }
     }
 
     // ---------- comandos ----------
@@ -161,6 +167,7 @@ public final class CodeGenerator {
                 guardar(resolucao.variavel(a));
             }
             case Stmt.Print p -> imprimir(p.expr());
+            case Stmt.Input i -> ler(resolucao.variavel(i));
             case Stmt.Block b -> b.stmts().forEach(this::stmt);
             case Stmt.CallStmt c -> chamada(c.call()); // valor de retorno descartado
             case Stmt.Return r -> {
@@ -226,15 +233,40 @@ public final class CodeGenerator {
             case INT -> {
                 emitir("push eax");
                 emitir("push fmt_print_int");
+                emitir("call _printf");
+                emitir("add esp, 8");
+            }
+            case FLOAT -> {
+                emitir("sub esp, 8", "printf recebe o double inteiro (8 bytes)");
+                emitir("movsd qword [esp], xmm0");
+                emitir("push fmt_print_float");
+                emitir("call _printf");
+                emitir("add esp, 12");
             }
             case BOOL -> {
                 paraString(Type.BOOL);
                 emitir("push eax");
                 emitir("push fmt_print_str");
+                emitir("call _printf");
+                emitir("add esp, 8");
             }
             default -> throw naoSuportado(e);
         }
-        emitir("call _printf");
+    }
+
+    /** input(x): a variável recebe o valor padrão antes (se a leitura falhar, fica com ele). */
+    private void ler(VarSymbol s) {
+        comentario("input " + s.nome() + " (" + s.tipo().nome() + ")");
+        guardarPadrao(s);
+        String formato = switch (s.tipo()) {
+            case INT -> "fmt_scan_int";
+            case FLOAT -> "fmt_scan_float";
+            default -> throw new IllegalStateException("input ainda não suportado para " + s.tipo());
+        };
+        emitir("lea eax, [" + endereco(s) + "]");
+        emitir("push eax");
+        emitir("push " + formato);
+        emitir("call _scanf");
         emitir("add esp, 8");
     }
 
@@ -244,11 +276,24 @@ public final class CodeGenerator {
         switch (expr) {
             case Expr.IntLit i -> emitir("mov eax, " + i.valor());
             case Expr.BoolLit b -> emitir("mov eax, " + (b.valor() ? 1 : 0));
+            case Expr.FloatLit f -> emitir("movsd xmm0, qword [" + constanteFloat(f.valor()) + "]", "" + f.valor());
             case Expr.Var v -> carregar(resolucao.variavel(v));
+            case Expr.Convert c -> {
+                expr(c.expr());
+                emitir("cvtsi2sd xmm0, eax", "int -> float");
+            }
             case Expr.Unary u -> {
                 expr(u.operando());
                 switch (u.op()) {
-                    case NEG -> emitir("neg eax");
+                    case NEG -> {
+                        if (u.getType() == Type.FLOAT) {
+                            emitir("movsd xmm1, xmm0");
+                            emitir("xorpd xmm0, xmm0");
+                            emitir("subsd xmm0, xmm1", "0.0 - x");
+                        } else {
+                            emitir("neg eax");
+                        }
+                    }
                     case NOT -> emitir("xor eax, 1", "!: 0 <-> 1");
                 }
             }
@@ -261,6 +306,10 @@ public final class CodeGenerator {
     private void binaria(Expr.Binary b) {
         if (b.op() == BinaryOp.AND || b.op() == BinaryOp.OR) {
             logicaCurtoCircuito(b);
+            return;
+        }
+        if (b.esq().getType() == Type.FLOAT) { // o semântico garante: os dois lados são float
+            binariaFloat(b);
             return;
         }
         // lado esquerdo na pilha, direito em ecx, esquerdo de volta em eax
@@ -289,6 +338,48 @@ public final class CodeGenerator {
             case GE -> comparar("setge");
             default -> throw naoSuportado(b);
         }
+    }
+
+    /** Operandos float: esquerdo na pilha (8 bytes), direito em xmm1, esquerdo de volta em xmm0. */
+    private void binariaFloat(Expr.Binary b) {
+        expr(b.esq());
+        empilhar(Type.FLOAT);
+        expr(b.dir());
+        emitir("movsd xmm1, xmm0");
+        emitir("movsd xmm0, qword [esp]");
+        emitir("add esp, 8");
+        switch (b.op()) {
+            case ADD -> emitir("addsd xmm0, xmm1");
+            case SUB -> emitir("subsd xmm0, xmm1");
+            case MUL -> emitir("mulsd xmm0, xmm1");
+            case DIV -> emitir("divsd xmm0, xmm1", "divisão por 0.0 dá infinito, sem erro");
+            // comisd ajusta CF/ZF como uma comparação sem sinal; PF=1 quando "não ordenado" (NaN)
+            case LT -> compararFloat("setb al");
+            case LE -> compararFloat("setbe al");
+            case GT -> compararFloat("seta al");
+            case GE -> compararFloat("setae al");
+            case EQ -> compararFloat("sete al", "setnp cl", "and al, cl");
+            case NE -> compararFloat("setne al", "setp cl", "or al, cl");
+            default -> throw naoSuportado(b);
+        }
+    }
+
+    private void compararFloat(String... instrucoes) {
+        emitir("comisd xmm0, xmm1");
+        for (String i : instrucoes) {
+            emitir(i);
+        }
+        emitir("movzx eax, al", "resultado bool: 0 ou 1");
+    }
+
+    /** Rótulo de uma constante double em .data (gravada pelos bits, sem arredondamento). */
+    private String constanteFloat(double valor) {
+        long bits = Double.doubleToRawLongBits(valor);
+        return floats.computeIfAbsent(bits, b -> {
+            String nome = "flt_" + floats.size();
+            constantes.append(String.format("%-15s dq 0x%016X       ; %s%n", nome, b, valor));
+            return nome;
+        });
     }
 
     private void comparar(String setcc) {
@@ -344,15 +435,27 @@ public final class CodeGenerator {
     }
 
     private void carregar(VarSymbol s) {
-        emitir("mov eax, dword [" + endereco(s) + "]", s.nome());
+        if (s.tipo() == Type.FLOAT) {
+            emitir("movsd xmm0, qword [" + endereco(s) + "]", s.nome());
+        } else {
+            emitir("mov eax, dword [" + endereco(s) + "]", s.nome());
+        }
     }
 
     private void guardar(VarSymbol s) {
-        emitir("mov dword [" + endereco(s) + "], eax", s.nome());
+        if (s.tipo() == Type.FLOAT) {
+            emitir("movsd qword [" + endereco(s) + "], xmm0", s.nome());
+        } else {
+            emitir("mov dword [" + endereco(s) + "], eax", s.nome());
+        }
     }
 
     private void guardarPadrao(VarSymbol s) {
-        emitir("mov dword [" + endereco(s) + "], 0", s.nome() + " = valor padrão");
+        String end = endereco(s);
+        emitir("mov dword [" + end + "], 0", s.nome() + " = valor padrão");
+        if (s.tipo() == Type.FLOAT) {
+            emitir("mov dword [" + end + "+4], 0", "0.0 = 8 bytes zerados");
+        }
     }
 
     // ---------- montagem do arquivo ----------
@@ -363,10 +466,10 @@ public final class CodeGenerator {
         asm.append("; Montar: nasm -f win32 prog.asm -o prog.obj\n");
         asm.append("; Ligar:  gcc -m32 prog.obj -o prog.exe\n\n");
         asm.append("global _main\n");
-        asm.append("extern _printf, _exit, _SetConsoleOutputCP@4, _SetConsoleCP@4\n\n");
+        asm.append("extern _printf, _scanf, _exit, _SetConsoleOutputCP@4, _SetConsoleCP@4\n\n");
 
         asm.append("section .data\n");
-        asm.append(Runtime.DADOS).append('\n');
+        asm.append(Runtime.DADOS).append(constantes).append('\n');
 
         asm.append("section .bss\n");
         for (String g : globais) {

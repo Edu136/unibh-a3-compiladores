@@ -35,7 +35,9 @@ class CodeGenE2ETest {
 
     private static void verificar(String fonte, String stdin, String saida, int codigo) throws Exception {
         E2E.Execucao r = E2E.executar(fonte, stdin);
-        assertEquals(saida, r.saida(), "saída de: " + fonte);
+        if (saida != null) { // null = só o código de saída importa (ex.: texto de infinito da msvcrt)
+            assertEquals(saida, r.saida(), "saída de: " + fonte);
+        }
         assertEquals(codigo, r.codigo(), "código de saída de: " + fonte);
     }
 
@@ -109,7 +111,22 @@ class CodeGenE2ETest {
                 caso("func eh(n: int): bool { return n > 0; } if (eh(5)) { print(1); }", "1\n"),
                 caso("func conta(n: int): int { var s: int = 0; for (var i: int = 1; i <= n; i = i + 1) "
                         + "{ var q: int = i * i; s = s + q; } return s; } print(conta(3)); print(conta(4));",
-                        "14\n30\n"));
+                        "14\n30\n"),
+
+                // ---- float ----
+                caso("print(2.5); print(1 + 2.5); print(7 / 2.0); var f: float = 3; print(f); print(-1.5);",
+                        "2.500000\n3.500000\n3.500000\n3.000000\n-1.500000\n"),
+                caso("print(1.5 < 2); print(2.0 == 2); print(0.1 + 0.2 == 0.3); print(2.5 >= 2.5); "
+                        + "print(1.0 != 1);",
+                        "true\ntrue\nfalse\ntrue\nfalse\n"),
+                caso("func media(a: float, b: float): float { return (a + b) / 2; } print(media(3, 4));",
+                        "3.500000\n"),
+                caso("var f: float; input(f); print(f * 2);", "2.5\n", "5.000000\n", 0),
+                caso("var f: float = 0; print(1.0 / f);", "", null, 0),
+                caso("func mix(a: int, x: float, b: int): float { var t: float = x * a; return t + b; } "
+                        + "print(mix(2, 1.5, 10)); var g: float; print(g);",
+                        "13.000000\n0.000000\n"),
+                caso("var n: int; input(n); print(n * 3);", "14\n", "42\n", 0));
     }
 
     @ParameterizedTest(name = "{0}")
