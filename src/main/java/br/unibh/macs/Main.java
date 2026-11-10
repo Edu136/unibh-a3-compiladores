@@ -35,8 +35,29 @@ public final class Main {
     private Main() {
     }
 
-    public static void main(String[] args) {
-        System.exit(run(args, System.out, System.err));
+    /** Pilha da thread do compilador: as fases são recursivas (parser, semântico, impressão). */
+    private static final long PILHA_BYTES = 64L * 1024 * 1024;
+
+    public static void main(String[] args) throws InterruptedException {
+        System.exit(executarComPilhaGrande(args, System.out, System.err));
+    }
+
+    /** Roda {@link #run} numa thread com pilha grande, para programas muito aninhados compilarem. */
+    static int executarComPilhaGrande(String[] args, PrintStream out, PrintStream err) throws InterruptedException {
+        int[] codigo = {ERRO_USO};
+        Runnable compilar = () -> {
+            try {
+                codigo[0] = run(args, out, err);
+            } catch (RuntimeException | Error e) {
+                // defeito do próprio compilador: mensagem curta, sem stack trace para o usuário
+                err.println("erro interno do compilador: " + e);
+                codigo[0] = ERRO_COMPILACAO;
+            }
+        };
+        Thread t = new Thread(null, compilar, "macsc", PILHA_BYTES);
+        t.start();
+        t.join();
+        return codigo[0];
     }
 
     /** Executa o compilador e devolve o código de saída (sem chamar System.exit). */
@@ -102,9 +123,13 @@ public final class Main {
             err.println(e.formatar(arquivo));
             return ERRO_COMPILACAO;
         } catch (StackOverflowError e) {
-            // o parser é recursivo: milhares de parênteses ou unários aninhados esgotam a pilha
-            err.println(arquivo + ": erro sintático: aninhamento profundo demais"
+            // as fases são recursivas; o estouro pode ocorrer em qualquer uma delas (sem rótulo de fase)
+            err.println(arquivo + ": erro: programa aninhado demais"
                     + " (expressões ou blocos aninhados em excesso)");
+            return ERRO_COMPILACAO;
+        } catch (OutOfMemoryError e) {
+            // ex.: --ast de um programa com centenas de milhares de níveis (indentação gigante)
+            err.println(arquivo + ": erro: programa grande demais para compilar");
             return ERRO_COMPILACAO;
         }
     }

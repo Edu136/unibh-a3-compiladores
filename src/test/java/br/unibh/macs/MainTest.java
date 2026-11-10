@@ -153,8 +153,20 @@ class MainTest {
     void aninhamentoProfundo() throws IOException {
         String fonte = "print(" + "- ".repeat(50_000) + "1);";
         assertEquals(1, executar(arquivo("fundo.macs", fonte)));
-        assertTrue(err().contains("fundo.macs: erro sintático: aninhamento profundo demais"), err());
+        // sem rótulo de fase: o estouro pode ocorrer no sintático, no semântico ou na impressão
+        assertTrue(err().contains("fundo.macs: erro: programa aninhado demais"), err());
+        assertFalse(err().contains("erro sintático"), err());
         assertFalse(err().contains("StackOverflowError"), err());
+    }
+
+    @Test
+    @DisplayName("o compilador roda numa thread com pilha grande: 5000 níveis compilam")
+    void pilhaGrandeNoMain() throws Exception {
+        String fonte = "print(" + "- ".repeat(5_000) + "1);";
+        String caminho = arquivo("medio.macs", fonte);
+        assertEquals(0, Main.executarComPilhaGrande(new String[] {caminho},
+                new java.io.PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                new java.io.PrintStream(errBytes, true, StandardCharsets.UTF_8)), err());
     }
 
     @Test
