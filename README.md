@@ -10,7 +10,7 @@ Trabalho A3 — Teoria da Computação e Compiladores — UniBH.
 |---|---|---|
 | Análise léxica | `br.unibh.macs.lexer` | concluída |
 | Análise sintática | `br.unibh.macs.parser` (árvore em `br.unibh.macs.ast`) | concluída |
-| Análise semântica | `br.unibh.macs.semantic` | — |
+| Análise semântica | `br.unibh.macs.semantic` | concluída |
 | Geração de código | `br.unibh.macs.codegen` | — |
 
 ## Requisitos
@@ -35,9 +35,9 @@ macsc.bat programa.macs [--tokens] [--ast]
 | Opção | Efeito |
 |---|---|
 | `--tokens` | imprime a lista de tokens (`linha:coluna  TIPO  lexema`) |
-| `--ast` | imprime a árvore sintática |
+| `--ast` | imprime a árvore sintática anotada com os tipos |
 
-Sem opções, o programa passa pelas análises léxica e sintática, e só os erros são mostrados.
+Sem opções, o programa passa pelas análises léxica, sintática e semântica, e só os erros são mostrados.
 
 O `macsc.bat` usa o Java indicado em `MACSC_JAVA`, se definido.
 
@@ -98,22 +98,59 @@ primaria   = INT_LIT | FLOAT_LIT | CHAR_LIT | STRING_LIT | "true" | "false"
 chamada    = ID "(" [ expr { "," expr } ] ")" ;
 ```
 
-Exemplo de `--ast`:
+- Comparações não podem ser encadeadas (`a < b < c` é erro; use `a < b && b < c`).
+- Funções só podem ser declaradas no nível global; comandos também podem ficar fora de funções.
+- Erros indicam o que era esperado e o que foi encontrado, por exemplo `prog.macs:3:15: erro sintático: esperado ';', encontrado 'print'`.
+
+## Análise semântica
+
+Verifica escopos e tipos, anota o tipo de cada expressão e insere as conversões implícitas. **Mostra todos os erros semânticos** (não só o primeiro), em ordem de posição.
+
+**Escopos**
+- Global → função → cada bloco `{ }` → cabeçalho do `for`. Uma variável só existe depois da declaração e até o fim do seu bloco.
+- Um bloco interno pode declarar uma variável com o mesmo nome de uma externa (ela esconde a externa).
+- Funções não acessam variáveis globais. Podem ser chamadas antes de declaradas (inclusive recursivamente).
+- Funções e variáveis têm espaços de nomes separados.
+
+**Tipos**
+
+| Operação | Operandos | Resultado |
+|---|---|---|
+| `+ - * /` | int e int | int |
+| `+ - * /` | int/float com pelo menos um float | float (o int é convertido) |
+| `%` | int e int | int |
+| `+` | um dos lados string (o outro de qualquer tipo) | string (concatenação) |
+| `< <= > >=` | numéricos, ou char e char | bool |
+| `== !=` | mesmo tipo (numéricos podem misturar) | bool |
+| `&& \|\| !` | bool | bool |
+| `-` unário | int ou float | o mesmo |
+
+- Atribuição, inicialização, argumentos e `return` aceitam o mesmo tipo ou int → float. float → int é erro.
+- Condições de `if`, `while` e `for` precisam ser `bool`. `input` não aceita variável `bool`.
+- Toda função precisa terminar em `return` em todos os caminhos (um `if` só garante retorno se tiver `else` e os dois lados retornarem).
+- Variáveis sem valor inicial começam com `0`, `0.0`, `'\0'`, `false` ou `""`.
+
+Exemplo de `--ast` (árvore anotada):
 
 ```text
 > macsc.bat exemplo.macs --ast
 Program
-  VarDecl x: int
-    Binary +
-      IntLit 1
-      Binary *
-        IntLit 2
-        IntLit 3
+  VarDecl f: float
+    Convert float
+      Binary + : int
+        IntLit 1 : int
+        IntLit 2 : int
 ```
 
-- Comparações não podem ser encadeadas (`a < b < c` é erro; use `a < b && b < c`).
-- Funções só podem ser declaradas no nível global; comandos também podem ficar fora de funções.
-- Erros indicam o que era esperado e o que foi encontrado, por exemplo `prog.macs:3:15: erro sintático: esperado ';', encontrado 'print'`.
+Exemplo de erros:
+
+```text
+> macsc.bat erros.macs
+erros.macs:5:1: erro semântico: função 'dobro' pode terminar sem return
+erros.macs:8:1: erro semântico: atribuição incompatível: 'total' é int, valor é float
+erros.macs:10:14: erro semântico: variável 'desconhecida' não declarada
+erros.macs:11:5: erro semântico: condição do if deve ser bool, encontrado int
+```
 
 ### Códigos de saída
 

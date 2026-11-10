@@ -6,6 +6,8 @@ import br.unibh.macs.erro.CompileError;
 import br.unibh.macs.lexer.Lexer;
 import br.unibh.macs.lexer.Token;
 import br.unibh.macs.parser.Parser;
+import br.unibh.macs.semantic.Resultado;
+import br.unibh.macs.semantic.SemanticAnalyzer;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
@@ -84,9 +86,16 @@ public final class Main {
                 imprimirTokens(tokens, out);
             }
             Program programa = Parser.analisar(tokens);
+            Resultado semantico = SemanticAnalyzer.analisar(programa);
+            if (semantico.temErros()) {
+                for (CompileError erro : semantico.erros()) {
+                    err.println(erro.formatar(arquivo));
+                }
+                return ERRO_COMPILACAO;
+            }
             if (mostrarAst) {
                 // println linha a linha: mesmo fim de linha do sistema que o --tokens
-                AstPrinter.imprimir(programa).lines().forEach(out::println);
+                AstPrinter.imprimir(semantico.programa()).lines().forEach(out::println);
             }
             return SUCESSO;
         } catch (CompileError e) {

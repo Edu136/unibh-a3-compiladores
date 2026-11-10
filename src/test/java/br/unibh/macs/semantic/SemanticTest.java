@@ -322,6 +322,22 @@ class SemanticTest {
                 "1:24 variável 'b' não declarada", "1:35 variável 'a' não declarada");
     }
 
+    // ---------- programa completo ----------
+
+    @Test
+    @DisplayName("fatorial passa sem erros e gera a árvore anotada esperada")
+    void programaFatorial() throws Exception {
+        String esperado = recurso("fatorial.tipado.ast").replace("\r\n", "\n");
+        assertEquals(esperado, arvore(recurso("fatorial.macs")));
+    }
+
+    private static String recurso(String nome) throws Exception {
+        try (var in = SemanticTest.class.getResourceAsStream("/" + nome)) {
+            assertNotNull(in, "recurso de teste não encontrado: " + nome);
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
     @Test
     @DisplayName("um erro não gera outros em cascata")
     void semCascata() {

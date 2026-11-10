@@ -84,19 +84,42 @@ class MainTest {
     // ---------- fase sintática ----------
 
     @Test
-    @DisplayName("--ast imprime a árvore e sai com 0")
+    @DisplayName("--ast imprime a árvore anotada com tipos e conversões, e sai com 0")
     void astComSucesso() throws IOException {
-        int rc = executar(arquivo("ok.macs", "var x: int = 1 + 2;"), "--ast");
+        int rc = executar(arquivo("ok.macs", "var f: float = 1 + 2;"), "--ast");
 
         assertEquals(0, rc);
         assertEquals(String.join("\n",
                         "Program",
-                        "  VarDecl x: int",
-                        "    Binary +",
-                        "      IntLit 1",
-                        "      IntLit 2"),
+                        "  VarDecl f: float",
+                        "    Convert float",
+                        "      Binary + : int",
+                        "        IntLit 1 : int",
+                        "        IntLit 2 : int"),
                 out().strip().replace("\r\n", "\n"));
         assertEquals("", err());
+    }
+
+    // ---------- fase semântica ----------
+
+    @Test
+    @DisplayName("todos os erros semânticos vão para o stderr, em ordem, e sai com 1")
+    void errosSemanticos() throws IOException {
+        int rc = executar(arquivo("s.macs", "print(a);\nprint(b);"));
+
+        assertEquals(1, rc);
+        String[] linhas = err().strip().split("\\R");
+        assertEquals(2, linhas.length, err());
+        assertTrue(linhas[0].endsWith("s.macs:1:7: erro semântico: variável 'a' não declarada"), linhas[0]);
+        assertTrue(linhas[1].endsWith("s.macs:2:7: erro semântico: variável 'b' não declarada"), linhas[1]);
+    }
+
+    @Test
+    @DisplayName("--ast com erro semântico não imprime a árvore")
+    void astComErroSemantico() throws IOException {
+        assertEquals(1, executar(arquivo("s.macs", "print(a);"), "--ast"));
+        assertEquals("", out());
+        assertTrue(err().contains("erro semântico"), err());
     }
 
     @Test
@@ -193,8 +216,12 @@ class MainTest {
     @Test
     @DisplayName("BOM UTF-8 no início do arquivo é ignorado")
     void bomUtf8() throws IOException {
-        byte[] comBom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF, 'x', '=', '1', ';'};
+        byte[] bom = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] programa = "var x: int;".getBytes(StandardCharsets.UTF_8);
+        byte[] comBom = new byte[bom.length + programa.length];
+        System.arraycopy(bom, 0, comBom, 0, bom.length);
+        System.arraycopy(programa, 0, comBom, bom.length, programa.length);
         assertEquals(0, executar(arquivo("bom.macs", comBom), "--tokens"));
-        assertTrue(out().startsWith("1:1  ID  x"), out());
+        assertTrue(out().startsWith("1:1  VAR  var"), out());
     }
 }

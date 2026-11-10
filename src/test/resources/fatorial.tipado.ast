@@ -1,0 +1,44 @@
+Program
+  FuncDecl fatorial(n: int): int
+    Block
+      If
+        Binary <= : bool
+          Var n : int
+          IntLit 1 : int
+        Block
+          Return
+            IntLit 1 : int
+      Return
+        Binary * : int
+          Var n : int
+          Call fatorial : int
+            Binary - : int
+              Var n : int
+              IntLit 1 : int
+  VarDecl numero: int
+  Print
+    StringLit "Digite um número: " : string
+  Input numero
+  For
+    Init
+      VarDecl i: int
+        IntLit 1 : int
+    Cond
+      Binary <= : bool
+        Var i : int
+        Var numero : int
+    Passo
+      Assign i
+        Binary + : int
+          Var i : int
+          IntLit 1 : int
+    Block
+      Print
+        Binary + : string
+          Binary + : string
+            Binary + : string
+              StringLit "Fatorial de " : string
+              Var i : int
+            StringLit " = " : string
+          Call fatorial : int
+            Var i : int
