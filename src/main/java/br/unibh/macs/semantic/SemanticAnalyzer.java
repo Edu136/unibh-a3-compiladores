@@ -62,17 +62,20 @@ public final class SemanticAnalyzer {
             case Stmt.Print p -> new Stmt.Print(expr(p.expr()), p.linha(), p.coluna());
             case Stmt.Input i -> {
                 VarSymbol s = resolver(i.nome(), i.linha(), i.coluna());
+                if (s != null && s.tipo() == Type.BOOL) {
+                    erro(i.linha(), i.coluna(), "input não aceita variável bool");
+                }
                 Stmt.Input novo = new Stmt.Input(i.nome(), i.linha(), i.coluna());
                 registrar(novo, s);
                 yield novo;
             }
-            case Stmt.If i -> new Stmt.If(expr(i.cond()), bloco(i.entao()),
+            case Stmt.If i -> new Stmt.If(condicao(i.cond(), "if"), bloco(i.entao()),
                     i.senao() == null ? null : stmt(i.senao()), i.linha(), i.coluna());
-            case Stmt.While w -> new Stmt.While(expr(w.cond()), bloco(w.corpo()), w.linha(), w.coluna());
+            case Stmt.While w -> new Stmt.While(condicao(w.cond(), "while"), bloco(w.corpo()), w.linha(), w.coluna());
             case Stmt.For f -> {
                 tabela.abrir(); // a variável do init vale no cabeçalho e no corpo
                 Stmt init = f.init() == null ? null : stmt(f.init());
-                Expr cond = f.cond() == null ? null : expr(f.cond());
+                Expr cond = f.cond() == null ? null : condicao(f.cond(), "for");
                 Stmt.Assign passo = f.passo() == null ? null : atribuicao(f.passo());
                 Stmt.Block corpo = bloco(f.corpo());
                 tabela.fechar();
@@ -232,6 +235,15 @@ public final class SemanticAnalyzer {
     }
 
     // ---------- regras auxiliares ----------
+
+    /** Condição de if/while/for: precisa ser bool. */
+    private Expr condicao(Expr cond, String comando) {
+        Expr e = expr(cond);
+        if (e.getType() != null && e.getType() != Type.BOOL) {
+            erro(e.linha(), e.coluna(), "condição do " + comando + " deve ser bool, encontrado " + e.getType().nome());
+        }
+        return e;
+    }
 
     /**
      * Verifica se o valor pode ir para um destino do tipo dado (igual, ou int→float com Convert).

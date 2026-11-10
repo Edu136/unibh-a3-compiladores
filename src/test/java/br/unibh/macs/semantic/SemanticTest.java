@@ -174,6 +174,30 @@ class SemanticTest {
         assertErros(fonte, erro);
     }
 
+    // ---------- comandos ----------
+
+    static Stream<Arguments> comandosInvalidos() {
+        return Stream.of(
+                Arguments.of("if (1) { }", "1:5 condição do if deve ser bool, encontrado int"),
+                Arguments.of("while (\"s\") { }", "1:8 condição do while deve ser bool, encontrado string"),
+                Arguments.of("for (; 1; ) { }", "1:8 condição do for deve ser bool, encontrado int"),
+                Arguments.of("var x: int = 2.5;", "1:1 inicialização incompatível: 'x' é int, valor é float"),
+                Arguments.of("var x: int; x = \"a\";", "1:13 atribuição incompatível: 'x' é int, valor é string"),
+                Arguments.of("var b: bool; input(b);", "1:14 input não aceita variável bool"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("comandosInvalidos")
+    void comandoInvalido(String fonte, String erro) {
+        assertErros(fonte, erro);
+    }
+
+    @Test
+    @DisplayName("input aceita int, float, char e string")
+    void inputValido() {
+        assertSemErros("var a: int; var b: float; var c: char; var d: string; input(a); input(b); input(c); input(d);");
+    }
+
     @Test
     @DisplayName("um erro não gera outros em cascata")
     void semCascata() {
