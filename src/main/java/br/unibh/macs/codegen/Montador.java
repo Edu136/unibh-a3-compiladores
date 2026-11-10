@@ -34,6 +34,7 @@ public final class Montador {
 
     private final List<String> nasm;
     private final List<String> gcc;
+    private volatile boolean verificado = false; // as ferramentas só são conferidas uma vez por instância
 
     public Montador() {
         this(List.of("nasm"), List.of("gcc"));
@@ -57,6 +58,9 @@ public final class Montador {
 
     /** Confere se nasm e gcc existem e se o gcc gera código de 32 bits (i686). */
     public void verificarFerramentas() throws FalhaMontagem {
+        if (verificado) {
+            return;
+        }
         try {
             executar(comando(nasm, "-v"));
         } catch (IOException e) {
@@ -72,6 +76,7 @@ public final class Montador {
         if (!alvo.startsWith("i686")) {
             throw new FalhaMontagem("gcc não é i686 (encontrado: " + alvo + "); é preciso o MinGW-w64 de 32 bits", true);
         }
+        verificado = true;
     }
 
     /** Monta {@code asm} e liga em {@code exe}. O .obj intermediário é apagado no fim. */

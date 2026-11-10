@@ -23,6 +23,9 @@ final class E2E {
     record Execucao(String saida, int codigo) {
     }
 
+    /** Compartilhado: as ferramentas são verificadas uma única vez para todos os testes. */
+    private static final Montador MONTADOR = new Montador();
+
     private E2E() {
     }
 
@@ -38,7 +41,7 @@ final class E2E {
         Path asm = dir.resolve("prog.asm");
         Path exe = dir.resolve("prog.exe");
         Files.writeString(asm, asm(fonte), StandardCharsets.UTF_8);
-        new Montador().gerarExe(asm, exe);
+        MONTADOR.gerarExe(asm, exe);
 
         Process p = new ProcessBuilder(exe.toString()).redirectErrorStream(true).start();
         try (OutputStream in = p.getOutputStream()) {
