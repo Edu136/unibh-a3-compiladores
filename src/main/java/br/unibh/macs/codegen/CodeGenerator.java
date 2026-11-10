@@ -28,6 +28,7 @@ public final class CodeGenerator {
     private final StringBuilder constantes = new StringBuilder(); // .data do programa (floats, strings)
     private final Set<String> globais = new LinkedHashSet<>();
     private final java.util.Map<Long, String> floats = new java.util.HashMap<>();
+    private final java.util.Map<String, String> strings = new java.util.HashMap<>();
     private int proximoRotulo = 0;
 
     // função sendo gerada (null = código global, em _main)
@@ -243,14 +244,13 @@ public final class CodeGenerator {
                 emitir("call _printf");
                 emitir("add esp, 12");
             }
-            case BOOL -> {
-                paraString(Type.BOOL);
+            case BOOL, CHAR, STRING -> {
+                paraString(e.getType()); // bool vira "true"/"false"; char vira texto UTF-8
                 emitir("push eax");
                 emitir("push fmt_print_str");
                 emitir("call _printf");
                 emitir("add esp, 8");
             }
-            default -> throw naoSuportado(e);
         }
     }
 
@@ -258,14 +258,25 @@ public final class CodeGenerator {
     private void ler(VarSymbol s) {
         comentario("input " + s.nome() + " (" + s.tipo().nome() + ")");
         guardarPadrao(s);
-        String formato = switch (s.tipo()) {
-            case INT -> "fmt_scan_int";
-            case FLOAT -> "fmt_scan_float";
-            default -> throw new IllegalStateException("input ainda não suportado para " + s.tipo());
-        };
-        emitir("lea eax, [" + endereco(s) + "]");
-        emitir("push eax");
-        emitir("push " + formato);
+        if (s.tipo() == Type.STRING) {
+            emitir("push 256");
+            emitir("call _malloc", "buffer novo a cada leitura (não é liberado na v1)");
+            emitir("add esp, 4");
+            emitir("mov byte [eax], 0", "string vazia se a leitura falhar");
+            emitir("mov dword [" + endereco(s) + "], eax");
+            emitir("push eax");
+            emitir("push fmt_scan_str", "\" %255[^\\n]\": pula o \\n anterior e lê a linha toda");
+        } else {
+            String formato = switch (s.tipo()) {
+                case INT -> "fmt_scan_int";
+                case FLOAT -> "fmt_scan_float";
+                case CHAR -> "fmt_scan_char";
+                default -> throw new IllegalStateException("input não aceita " + s.tipo()); // o semântico barra bool
+            };
+            emitir("lea eax, [" + endereco(s) + "]");
+            emitir("push eax");
+            emitir("push " + formato);
+        }
         emitir("call _scanf");
         emitir("add esp, 8");
     }
@@ -276,6 +287,8 @@ public final class CodeGenerator {
         switch (expr) {
             case Expr.IntLit i -> emitir("mov eax, " + i.valor());
             case Expr.BoolLit b -> emitir("mov eax, " + (b.valor() ? 1 : 0));
+            case Expr.CharLit c -> emitir("mov eax, " + (int) c.valor(), "char (código Unicode)");
+            case Expr.StringLit s -> emitir("mov eax, " + constanteString(s.valor()));
             case Expr.FloatLit f -> emitir("movsd xmm0, qword [" + constanteFloat(f.valor()) + "]", "" + f.valor());
             case Expr.Var v -> carregar(resolucao.variavel(v));
             case Expr.Convert c -> {
@@ -308,6 +321,10 @@ public final class CodeGenerator {
             logicaCurtoCircuito(b);
             return;
         }
+        if (b.op() == BinaryOp.ADD && b.getType() == Type.STRING) {
+            concatenacao(b);
+            return;
+        }
         if (b.esq().getType() == Type.FLOAT) { // o semântico garante: os dois lados são float
             binariaFloat(b);
             return;
@@ -318,6 +335,16 @@ public final class CodeGenerator {
         expr(b.dir());
         emitir("mov ecx, eax");
         emitir("pop eax");
+        if (b.esq().getType() == Type.STRING) { // só == e != chegam aqui com strings
+            emitir("push ecx");
+            emitir("push eax");
+            emitir("call _strcmp", "compara o conteúdo, não o endereço");
+            emitir("add esp, 8");
+            emitir("test eax, eax");
+            emitir((b.op() == BinaryOp.EQ ? "sete" : "setne") + " al");
+            emitir("movzx eax, al");
+            return;
+        }
         switch (b.op()) {
             case ADD -> emitir("add eax, ecx");
             case SUB -> emitir("sub eax, ecx");
@@ -407,16 +434,78 @@ public final class CodeGenerator {
         rotulo(ok);
     }
 
-    /** Converte o valor em eax (do tipo dado) para string (ponteiro em eax). */
+    /** {@code a + b} com string: cada lado vira texto e o runtime aloca a junção. */
+    private void concatenacao(Expr.Binary b) {
+        comentario("concatenação");
+        expr(b.esq());
+        paraString(b.esq().getType());
+        emitir("push eax");
+        expr(b.dir());
+        paraString(b.dir().getType());
+        emitir("mov ecx, eax", "b");
+        emitir("pop eax", "a");
+        emitir("push ecx");
+        emitir("push eax");
+        emitir("call rt_concat", "rt_concat(a, b)");
+        emitir("add esp, 8");
+    }
+
+    /** Converte o valor atual (eax ou xmm0, do tipo dado) para string (ponteiro em eax). */
     private void paraString(Type tipo) {
         switch (tipo) {
-            case BOOL -> {
+            case STRING -> {
+                // já é string
+            }
+            case INT, BOOL, CHAR -> {
                 emitir("push eax");
-                emitir("call rt_str_bool");
+                emitir("call " + switch (tipo) {
+                    case INT -> "rt_str_int";
+                    case BOOL -> "rt_str_bool";
+                    default -> "rt_str_char";
+                });
                 emitir("add esp, 4");
             }
-            default -> throw new IllegalStateException("conversão para string ainda não suportada: " + tipo);
+            case FLOAT -> {
+                emitir("sub esp, 8");
+                emitir("movsd qword [esp], xmm0");
+                emitir("call rt_str_float");
+                emitir("add esp, 8");
+            }
         }
+    }
+
+    /** Rótulo de uma string literal em .data (UTF-8, terminada em 0). */
+    private String constanteString(String valor) {
+        if (valor.isEmpty()) {
+            return "str_vazia";
+        }
+        return strings.computeIfAbsent(valor, v -> {
+            String nome = "str_" + strings.size();
+            constantes.append(String.format("%-15s db `%s`, 0%n", nome, escaparNasm(v)));
+            return nome;
+        });
+    }
+
+    /** Escapa para string NASM entre crases (que aceita \n, \t, \\, \` e \xNN). */
+    private static String escaparNasm(String texto) {
+        StringBuilder r = new StringBuilder();
+        for (char c : texto.toCharArray()) {
+            switch (c) {
+                case '\\' -> r.append("\\\\");
+                case '`' -> r.append("\\`");
+                case '\n' -> r.append("\\n");
+                case '\t' -> r.append("\\t");
+                case '\r' -> r.append("\\r");
+                default -> {
+                    if (c < 0x20) {
+                        r.append(String.format("\\x%02X", (int) c));
+                    } else {
+                        r.append(c); // acentos vão como UTF-8 (o .asm é gravado em UTF-8)
+                    }
+                }
+            }
+        }
+        return r.toString();
     }
 
     // ---------- variáveis ----------
@@ -452,6 +541,10 @@ public final class CodeGenerator {
 
     private void guardarPadrao(VarSymbol s) {
         String end = endereco(s);
+        if (s.tipo() == Type.STRING) {
+            emitir("mov dword [" + end + "], str_vazia", s.nome() + " = \"\"");
+            return;
+        }
         emitir("mov dword [" + end + "], 0", s.nome() + " = valor padrão");
         if (s.tipo() == Type.FLOAT) {
             emitir("mov dword [" + end + "+4], 0", "0.0 = 8 bytes zerados");
@@ -466,7 +559,8 @@ public final class CodeGenerator {
         asm.append("; Montar: nasm -f win32 prog.asm -o prog.obj\n");
         asm.append("; Ligar:  gcc -m32 prog.obj -o prog.exe\n\n");
         asm.append("global _main\n");
-        asm.append("extern _printf, _scanf, _exit, _SetConsoleOutputCP@4, _SetConsoleCP@4\n\n");
+        asm.append("extern _printf, _scanf, _sprintf, _malloc, _strlen, _strcpy, _strcat, _strcmp, _exit\n");
+        asm.append("extern _SetConsoleOutputCP@4, _SetConsoleCP@4\n\n");
 
         asm.append("section .data\n");
         asm.append(Runtime.DADOS).append(constantes).append('\n');

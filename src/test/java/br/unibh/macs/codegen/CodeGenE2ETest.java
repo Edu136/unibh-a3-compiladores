@@ -126,7 +126,23 @@ class CodeGenE2ETest {
                 caso("func mix(a: int, x: float, b: int): float { var t: float = x * a; return t + b; } "
                         + "print(mix(2, 1.5, 10)); var g: float; print(g);",
                         "13.000000\n0.000000\n"),
-                caso("var n: int; input(n); print(n * 3);", "14\n", "42\n", 0));
+                caso("var n: int; input(n); print(n * 3);", "14\n", "42\n", 0),
+
+                // ---- string e char ----
+                caso("print(\"olá, mundo\");", "olá, mundo\n"),
+                caso("print(\"n = \" + 1 + 2.5 + true + 'c');", "n = 12.500000truec\n"),
+                caso("print(1 + 2 + \"a\"); print(\"a\" + 1 + 2);", "3a\na12\n"),
+                caso("print(\"abc\" == \"abc\"); print(\"abc\" != \"abd\"); var s: string = \"ab\" + \"c\"; "
+                        + "print(s == \"abc\");", "true\ntrue\ntrue\n"),
+                caso("var c: char = 'á'; print(c); print('a' < 'b'); print(\"x\" + c);", "á\ntrue\nxá\n"),
+                caso("var s: string; print(\"[\" + s + \"]\"); print(\"a\\tb\\\\c\\\"d\");", "[]\na\tb\\c\"d\n"),
+                caso("var n: int; var s: string; input(n); input(s); print(s + \" \" + n);",
+                        "7\nSão Paulo\n", "São Paulo 7\n", 0),
+                caso("var c: char; input(c); print(c);", "x\n", "x\n", 0),
+                caso("print(\"a`b\");", "a`b\n"),
+                caso("func saud(n: string): string { return \"Olá, \" + n; } print(saud(\"Ana\"));", "Olá, Ana\n"),
+                caso("var a: string = \"x\"; var b: string = a; a = a + \"y\"; print(a); print(b); "
+                        + "print('\\n' == '\\n'); print(\"\" == \"\");", "xy\nx\ntrue\ntrue\n"));
     }
 
     @ParameterizedTest(name = "{0}")
