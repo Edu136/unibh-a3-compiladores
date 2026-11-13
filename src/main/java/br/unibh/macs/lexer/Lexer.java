@@ -74,11 +74,28 @@ public final class Lexer {
             switch (c) {
                 case '"' -> lerString();
                 case '\'' -> lerChar();
-                case '+' -> adicionar(TokenType.PLUS);
-                case '-' -> adicionar(TokenType.MINUS);
-                case '*' -> adicionar(TokenType.STAR);
-                case '/' -> adicionar(TokenType.SLASH); // comentários já foram pulados
-                case '%' -> adicionar(TokenType.PERCENT);
+                case '+' -> {
+                    if (seguidoDe('+')) {
+                        adicionar(TokenType.INC);
+                    } else if (seguidoDe('=')) {
+                        adicionar(TokenType.PLUS_ASSIGN);
+                    } else {
+                        adicionar(TokenType.PLUS);
+                    }
+                }
+                case '-' -> {
+                    if (seguidoDe('-')) {
+                        adicionar(TokenType.DEC);
+                    } else if (seguidoDe('=')) {
+                        adicionar(TokenType.MINUS_ASSIGN);
+                    } else {
+                        adicionar(TokenType.MINUS);
+                    }
+                }
+                case '*' -> adicionar(seguidoDe('=') ? TokenType.STAR_ASSIGN : TokenType.STAR);
+                // comentários já foram pulados
+                case '/' -> adicionar(seguidoDe('=') ? TokenType.SLASH_ASSIGN : TokenType.SLASH);
+                case '%' -> adicionar(seguidoDe('=') ? TokenType.PERCENT_ASSIGN : TokenType.PERCENT);
                 case '(' -> adicionar(TokenType.LPAREN);
                 case ')' -> adicionar(TokenType.RPAREN);
                 case '{' -> adicionar(TokenType.LBRACE);
