@@ -343,6 +343,157 @@ class ParserTest {
                 "      IntLit 2");
     }
 
+    // ---------- atalhos de atribuição (STORY-005) ----------
+
+    @Test
+    @DisplayName("x++ vira x = x + 1")
+    void incremento() {
+        assertArvore("x++;",
+                "Program",
+                "  Assign x",
+                "    Binary +",
+                "      Var x",
+                "      IntLit 1");
+    }
+
+    @Test
+    @DisplayName("x-- vira x = x - 1")
+    void decremento() {
+        assertArvore("x--;",
+                "Program",
+                "  Assign x",
+                "    Binary -",
+                "      Var x",
+                "      IntLit 1");
+    }
+
+    @Test
+    @DisplayName("x += e vira x = x + (e)")
+    void maisIgualComExpressao() {
+        assertArvore("x += y * 2;",
+                "Program",
+                "  Assign x",
+                "    Binary +",
+                "      Var x",
+                "      Binary *",
+                "        Var y",
+                "        IntLit 2");
+    }
+
+    @Test
+    @DisplayName("o lado direito do atalho fica inteiro (\"entre parênteses\")")
+    void ladoDireitoDoAtalhoFicaAgrupado() {
+        assertArvore("x -= 3 - 1;",
+                "Program",
+                "  Assign x",
+                "    Binary -",
+                "      Var x",
+                "      Binary -",
+                "        IntLit 3",
+                "        IntLit 1");
+    }
+
+    @Test
+    @DisplayName("*=, /= e %=")
+    void vezesDivididoERestoIgual() {
+        assertArvore("a *= 2; b /= 3; c %= 4;",
+                "Program",
+                "  Assign a",
+                "    Binary *",
+                "      Var a",
+                "      IntLit 2",
+                "  Assign b",
+                "    Binary /",
+                "      Var b",
+                "      IntLit 3",
+                "  Assign c",
+                "    Binary %",
+                "      Var c",
+                "      IntLit 4");
+    }
+
+    @Test
+    @DisplayName("atalho no passo do for")
+    void atalhoNoPassoDoFor() {
+        assertArvore("for (var i: int = 0; i < 3; i++) { print(i); }",
+                "Program",
+                "  For",
+                "    Init",
+                "      VarDecl i: int",
+                "        IntLit 0",
+                "    Cond",
+                "      Binary <",
+                "        Var i",
+                "        IntLit 3",
+                "    Passo",
+                "      Assign i",
+                "        Binary +",
+                "          Var i",
+                "          IntLit 1",
+                "    Block",
+                "      Print",
+                "        Var i");
+    }
+
+    @Test
+    @DisplayName("atalho no início e no passo do for")
+    void atalhoNoInicioDoFor() {
+        assertArvore("for (i += 2; i < 9; i--) { }",
+                "Program",
+                "  For",
+                "    Init",
+                "      Assign i",
+                "        Binary +",
+                "          Var i",
+                "          IntLit 2",
+                "    Cond",
+                "      Binary <",
+                "        Var i",
+                "        IntLit 9",
+                "    Passo",
+                "      Assign i",
+                "        Binary -",
+                "          Var i",
+                "          IntLit 1",
+                "    Block");
+    }
+
+    @Test
+    @DisplayName("posições da árvore traduzida: Assign e Var no nome, Binary e IntLit no operador")
+    void posicoesDoAtalho() {
+        Stmt.Assign a = (Stmt.Assign) analisar("  conta++;").itens().get(0);
+        Expr.Binary soma = (Expr.Binary) a.valor();
+        assertAll(
+                () -> assertEquals(1, a.linha()),
+                () -> assertEquals(3, a.coluna()),
+                () -> assertEquals(1, soma.linha()),
+                () -> assertEquals(8, soma.coluna()),
+                () -> assertEquals(1, soma.esq().linha()),
+                () -> assertEquals(3, soma.esq().coluna()),
+                () -> assertEquals(1, soma.dir().linha()),
+                () -> assertEquals(8, soma.dir().coluna()));
+    }
+
+    @Test
+    @DisplayName("++ pré-fixado não existe")
+    void incrementoPrefixado() {
+        assertErro("++x;", 1, 1, "esperado comando, encontrado '++'");
+    }
+
+    @Test
+    @DisplayName("atalho não é expressão")
+    void atalhoDentroDeExpressao() {
+        assertErro("y = x++;", 1, 6, "esperado ';', encontrado '++'");
+        assertErro("print(x++);", 1, 8, "esperado ')', encontrado '++'");
+    }
+
+    @Test
+    @DisplayName("atalho sem lado direito, e '--' colado entre números")
+    void atalhoSemLadoDireito() {
+        assertErro("x += ;", 1, 6, "esperado expressão, encontrado ';'");
+        assertErro("print(5--3);", 1, 8, "esperado ')', encontrado '--'");
+    }
+
     // ---------- programa completo ----------
 
     @Test
