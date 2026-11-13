@@ -68,7 +68,8 @@ Exemplo:
 - Identificadores: `[A-Za-z_][A-Za-z0-9_]*` (sem acentos)
 - Literais: inteiros (`42`, até 2147483647), reais (`3.14`, com dígitos dos dois lados do ponto), caracteres (`'a'`) e strings (`"texto"`, sem quebra de linha)
 - Escapes em char e string: `\n \t \\ \" \' \0`
-- Operadores: `+ - * / % = == != < <= > >= && || !` e pontuação `( ) { } , ; :`
+- Operadores: `+ - * / % = == != < <= > >= && || !`, atalhos de atribuição `++ -- += -= *= /= %=` e pontuação `( ) { } , ; :`
+- Vale o maior casamento: `++`, `--` e `+=` são um token só. Por isso `5--3` é erro; para subtrair um negativo, escreva `5 - -3` ou `5 - (-3)`.
 - Comentários: `// linha` e `/* bloco */`
 - O código-fonte é lido em UTF-8 (com ou sem BOM), ou em Windows-1252 se não for UTF-8 válido. O analisador para no primeiro erro.
 
@@ -85,7 +86,8 @@ bloco      = "{" { comando } "}" ;
 comando    = declVar ";" | atribuicao ";" | chamada ";" | cmdPrint | cmdInput
            | cmdIf | cmdWhile | cmdFor | cmdReturn | bloco ;
 declVar    = "var" ID ":" tipo [ "=" expr ] ;
-atribuicao = ID "=" expr ;
+atribuicao = ID ( "=" expr | opComposto expr | "++" | "--" ) ;
+opComposto = "+=" | "-=" | "*=" | "/=" | "%=" ;
 cmdPrint   = "print" "(" expr ")" ";" ;
 cmdInput   = "input" "(" ID ")" ";" ;
 cmdIf      = "if" "(" expr ")" bloco [ "else" ( bloco | cmdIf ) ] ;
@@ -105,6 +107,8 @@ primaria   = INT_LIT | FLOAT_LIT | CHAR_LIT | STRING_LIT | "true" | "false"
 chamada    = ID "(" [ expr { "," expr } ] ")" ;
 ```
 
+- Os atalhos são traduzidos no sintático: `x++` vira `x = x + 1` e `x op= e` vira `x = x op (e)`; o semântico e o gerador não mudam.
+- Os atalhos são comandos, não expressões: `++x`, `y = x++;` e `print(x++);` são erro.
 - Comparações não podem ser encadeadas (`a < b < c` é erro; use `a < b && b < c`).
 - Funções só podem ser declaradas no nível global; comandos também podem ficar fora de funções.
 - Erros indicam o que era esperado e o que foi encontrado, por exemplo `prog.macs:3:15: erro sintático: esperado ';', encontrado 'print'`.
