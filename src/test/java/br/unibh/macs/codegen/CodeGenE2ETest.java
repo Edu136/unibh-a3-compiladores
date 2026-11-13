@@ -164,6 +164,21 @@ class CodeGenE2ETest {
                         + "print(7 / d); print(7 % d);",
                         "-2147483648\n-2147483648\n0\n-7\n0\n"),
 
+                // ---- atalhos de atribuição (STORY-005) ----
+                caso("var x: int = 5; x++; print(x); x--; x--; print(x);", "6\n4\n"),
+                caso("var x: int = 10; x += 5; print(x); x -= 3; print(x); x *= 2; print(x); "
+                        + "x /= 4; print(x); x %= 4; print(x);",
+                        "15\n12\n24\n6\n2\n"),
+                caso("var x: int = 10; x -= 3 - 1; print(x); x *= 2 + 1; print(x);", "8\n24\n"),
+                caso("for (var i: int = 0; i < 3; i++) { print(i); }", "0\n1\n2\n"),
+                caso("for (var i: int = 3; i > 0; i--) { print(i); }", "3\n2\n1\n"),
+                caso("var f: float = 1.5; f++; print(f); f *= 2; print(f);", "2.500000\n5.000000\n"),
+                caso("var s: string = \"ab\"; s += \"c\"; s += 1; print(s);", "abc1\n"),
+                caso("func soma(n: int): int { var s: int = 0; for (var i: int = 1; i <= n; i++) { s += i; } "
+                        + "return s; } print(soma(4));", "10\n"),
+                caso("var x: int = 7; var z: int = 0; x /= z;", "",
+                        "erro de execução: divisão por zero (linha 1)\n", 1),
+
                 // ---- entrada com BOM (pipe do PowerShell 5.1 envia EF BB BF antes do texto) ----
                 caso("var n: int; input(n); print(n); var s: string; input(s); print(s);",
                         "﻿42\nolá\n", "42\nolá\n", 0),
