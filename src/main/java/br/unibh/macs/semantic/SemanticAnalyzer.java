@@ -407,6 +407,11 @@ public final class SemanticAnalyzer {
     }
 
     private void erro(int linha, int coluna, String mensagem) {
+        for (CompileError e : erros) {
+            if (e.getLinha() == linha && e.getColuna() == coluna && e.getMessage().equals(mensagem)) {
+                return; // mesmo erro, mesma posição (ex.: x++ com x não declarada procura x duas vezes)
+            }
+        }
         erros.add(new CompileError(CompileError.Fase.SEMANTICO, linha, coluna, mensagem));
     }
 }

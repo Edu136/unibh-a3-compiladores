@@ -329,6 +329,61 @@ class SemanticTest {
                 "1:24 variável 'b' não declarada", "1:35 variável 'a' não declarada");
     }
 
+    // ---------- atalhos de atribuição (STORY-005) ----------
+
+    @Test
+    @DisplayName("atalhos com int passam sem erros")
+    void atalhosComInt() {
+        assertSemErros("var x: int = 1; x++; x -= 2; x *= 3; x /= 2; x %= 2;");
+    }
+
+    @Test
+    @DisplayName("f++ com float promove o 1 para float")
+    void incrementoDeFloat() {
+        assertContemLinhas(arvore("var f: float = 1.5; f++;"),
+                "  Assign f",
+                "    Binary + : float",
+                "      Var f : float",
+                "      Convert float",
+                "        IntLit 1 : int");
+    }
+
+    @Test
+    @DisplayName("float aceita qualquer atalho numérico")
+    void atalhosComFloat() {
+        assertSemErros("var f: float = 2.0; f += 1; f -= 0.5; f *= 2; f /= 4;");
+    }
+
+    @Test
+    @DisplayName("+= e ++ em string concatenam")
+    void atalhosComString() {
+        assertSemErros("var s: string = \"a\"; s += \"b\"; s += 1; s++;");
+    }
+
+    static Stream<Arguments> atalhosInvalidos() {
+        return Stream.of(
+                Arguments.of("var b: bool = true; b++;", "1:22 operador '+' não se aplica a bool e int"),
+                Arguments.of("var c: char = 'a'; c--;", "1:21 operador '-' não se aplica a char e int"),
+                // o Assign e o Var criado pelo sintático procuram o nome na mesma posição: um erro só
+                Arguments.of("y++;", "1:1 variável 'y' não declarada"),
+                Arguments.of("var g: int = 0; func f(): int { g++; return 1; }",
+                        "1:33 variável 'g' não declarada (funções não acessam variáveis globais)"),
+                Arguments.of("var x: int = 1; x *= 2.5;", "1:17 atribuição incompatível: 'x' é int, valor é float"),
+                Arguments.of("var f: float = 1.0; f %= 2;", "1:23 operador '%' não se aplica a float e int"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("atalhosInvalidos")
+    void atalhoInvalido(String fonte, String erro) {
+        assertErros(fonte, erro);
+    }
+
+    @Test
+    @DisplayName("na forma longa, erros iguais em posições diferentes continuam separados")
+    void formaLongaComVariavelNaoDeclarada() {
+        assertErros("x = x + 1;", "1:1 variável 'x' não declarada", "1:5 variável 'x' não declarada");
+    }
+
     // ---------- programa completo ----------
 
     @Test
