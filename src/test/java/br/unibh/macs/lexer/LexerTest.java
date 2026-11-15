@@ -76,6 +76,13 @@ class LexerTest {
                 t.subList(0, 5).stream().map(Token::lexema).toList());
     }
 
+    @Test
+    @DisplayName("break é palavra-chave; breakpoint continua identificador")
+    void palavraChaveBreak() {
+        assertEquals(List.of(BREAK, ID, EOF), tipos("break breakpoint"));
+        assertEquals(List.of(BREAK, SEMICOLON, EOF), tipos("break;"));
+    }
+
     // ---------- literais ----------
 
     @Test

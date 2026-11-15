@@ -384,6 +384,35 @@ class SemanticTest {
         assertErros("x = x + 1;", "1:1 variável 'x' não declarada", "1:5 variável 'x' não declarada");
     }
 
+    // ---------- break (STORY-008) ----------
+
+    @Test
+    @DisplayName("break dentro de while, for, if e bloco")
+    void breakDentroDeLaco() {
+        assertSemErros("while (true) { break; } for (;;) { if (true) { { break; } } }");
+    }
+
+    @Test
+    @DisplayName("break dentro de laço em função")
+    void breakEmLacoDeFuncao() {
+        assertSemErros("func f(): int { while (true) { break; } return 1; }");
+    }
+
+    static Stream<Arguments> breaksForaDeLaco() {
+        return Stream.of(
+                Arguments.of("break;", "1:1 break fora de laço"),
+                Arguments.of("if (true) { break; }", "1:13 break fora de laço"),
+                Arguments.of("func f(): int { break; return 1; }", "1:17 break fora de laço"),
+                // se passar sem erro, o contador não está sendo diminuído na saída do laço
+                Arguments.of("while (false) { } break;", "1:19 break fora de laço"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("breaksForaDeLaco")
+    void breakForaDeLaco(String fonte, String erro) {
+        assertErros(fonte, erro);
+    }
+
     // ---------- programa completo ----------
 
     @Test

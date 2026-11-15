@@ -44,6 +44,10 @@ public sealed interface Stmt extends Item {
     record Return(Expr expr, int linha, int coluna) implements Stmt {
     }
 
+    /** {@code break;} — sai do laço mais interno. */
+    record Break(int linha, int coluna) implements Stmt {
+    }
+
     /** {@code { comandos }} */
     record Block(List<Stmt> stmts, int linha, int coluna) implements Stmt {
     }

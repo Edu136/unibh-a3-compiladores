@@ -69,6 +69,12 @@ class CodeGenE2ETest {
         assertTrue(asm.contains("_SetConsoleOutputCP@4"), asm);
     }
 
+    @Test
+    void asmTemSaltoDoBreak() {
+        String asm = E2E.asm("while (true) { break; }");
+        assertTrue(asm.contains("; break"), asm);
+    }
+
     // ---------- tabelas de cenários (preenchidas nos próximos ciclos) ----------
 
     static Stream<Arguments> casos() {
@@ -182,7 +188,23 @@ class CodeGenE2ETest {
                 // ---- entrada com BOM (pipe do PowerShell 5.1 envia EF BB BF antes do texto) ----
                 caso("var n: int; input(n); print(n); var s: string; input(s); print(s);",
                         "﻿42\nolá\n", "42\nolá\n", 0),
-                caso("var s: string; input(s); print(s);", "﻿São Paulo\n", "São Paulo\n", 0));
+                caso("var s: string; input(s); print(s);", "﻿São Paulo\n", "São Paulo\n", 0),
+
+                // ---- break (STORY-008) ----
+                caso("var n: int = 0; while (true) { n = n + 1; if (n * n > 50) { break; } } print(n);", "8\n"),
+                caso("for (var i: int = 0; i < 10; i = i + 1) { if (i == 4) { break; } print(i); }",
+                        "0\n1\n2\n3\n"),
+                // o break também pula o passo do for: i e k ficam em 0
+                caso("var k: int = 9; for (var i: int = 0; i < 5; i = i + 1) { k = i; break; } print(k);", "0\n"),
+                // laços aninhados: o break interno não pode sair do for externo
+                caso("for (var i: int = 0; i < 3; i = i + 1) { while (true) { break; } print(i); }", "0\n1\n2\n"),
+                caso("for (var i: int = 0; i < 3; i = i + 1) { for (var j: int = 0; j < 3; j = j + 1) "
+                        + "{ if (j == 1) { break; } print(i * 10 + j); } }",
+                        "0\n10\n20\n"),
+                caso("func raiz(n: int): int { var r: int = 0; while (true) { if ((r + 1) * (r + 1) > n) { break; } "
+                        + "r = r + 1; } return r; } print(raiz(50));", "7\n"),
+                caso("var i: int = 0; while (i < 100) { i = i + 1; if (i == 3) { break; } } print(\"parou em \" + i);",
+                        "parou em 3\n"));
     }
 
     @ParameterizedTest(name = "{0}")
