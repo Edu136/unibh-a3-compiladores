@@ -9,6 +9,8 @@ import br.unibh.macs.ast.Stmt;
 import br.unibh.macs.ast.Type;
 import br.unibh.macs.semantic.Resolucao;
 import br.unibh.macs.semantic.VarSymbol;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -30,6 +32,8 @@ public final class CodeGenerator {
     private final java.util.Map<Long, String> floats = new java.util.HashMap<>();
     private final java.util.Map<String, String> strings = new java.util.HashMap<>();
     private int proximoRotulo = 0;
+    /** Rótulo de fim de cada laço aberto; o topo é o laço mais interno (alvo do break). */
+    private final Deque<String> fimDosLacos = new ArrayDeque<>();
 
     // função sendo gerada (null = código global, em _main)
     private FuncDecl funcaoAtual = null;
@@ -203,7 +207,9 @@ public final class CodeGenerator {
                 expr(w.cond());
                 emitir("test eax, eax");
                 emitir("jz " + fim, "sai do laço");
+                fimDosLacos.push(fim);
                 stmt(w.corpo());
+                fimDosLacos.pop();
                 emitir("jmp " + inicio);
                 rotulo(fim);
             }
@@ -220,13 +226,16 @@ public final class CodeGenerator {
                     emitir("test eax, eax");
                     emitir("jz " + fim, "sai do laço");
                 }
+                fimDosLacos.push(fim);
                 stmt(f.corpo());
+                fimDosLacos.pop();
                 if (f.passo() != null) {
                     stmt(f.passo());
                 }
                 emitir("jmp " + inicio);
                 rotulo(fim);
             }
+            case Stmt.Break b -> emitir("jmp " + fimDosLacos.peek(), "break");
             default -> throw naoSuportado(stmt);
         }
     }
