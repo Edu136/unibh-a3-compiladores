@@ -19,6 +19,7 @@ public final class Lexer {
             Map.entry("while", TokenType.WHILE),
             Map.entry("for", TokenType.FOR),
             Map.entry("return", TokenType.RETURN),
+            Map.entry("break", TokenType.BREAK),
             Map.entry("print", TokenType.PRINT),
             Map.entry("input", TokenType.INPUT),
             Map.entry("true", TokenType.TRUE),

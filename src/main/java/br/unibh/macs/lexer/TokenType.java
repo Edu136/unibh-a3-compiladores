@@ -3,7 +3,7 @@ package br.unibh.macs.lexer;
 /** Categorias de token da MACSLang. */
 public enum TokenType {
     // palavras-chave
-    VAR, FUNC, IF, ELSE, WHILE, FOR, RETURN, PRINT, INPUT, TRUE, FALSE,
+    VAR, FUNC, IF, ELSE, WHILE, FOR, RETURN, BREAK, PRINT, INPUT, TRUE, FALSE,
     INT, FLOAT, CHAR, BOOL, STRING,
 
     // literais e nomes
