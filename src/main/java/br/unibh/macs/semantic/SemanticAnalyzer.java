@@ -156,6 +156,7 @@ public final class SemanticAnalyzer {
             case Stmt.Block b -> bloco(b);
             case Stmt.CallStmt c -> new Stmt.CallStmt(chamada(c.call()), c.linha(), c.coluna());
             case Stmt.Return r -> retorno(r);
+            case Stmt.Break b -> b;
         };
     }
 

@@ -87,6 +87,7 @@ public final class Parser {
             case WHILE -> cmdWhile();
             case FOR -> cmdFor();
             case RETURN -> cmdReturn();
+            case BREAK -> cmdBreak();
             case LBRACE -> bloco();
             case FUNC -> throw erroNoAtual("função só pode ser declarada no nível global");
             default -> throw esperado("comando");
@@ -142,6 +143,13 @@ public final class Parser {
         Expr e = expr();
         consumirPontoEVirgula();
         return new Stmt.Return(e, r.linha(), r.coluna());
+    }
+
+    // cmdBreak = "break" ";" ;
+    private Stmt.Break cmdBreak() {
+        Token b = consumir(BREAK, "'break'");
+        consumirPontoEVirgula();
+        return new Stmt.Break(b.linha(), b.coluna());
     }
 
     private Expr condicaoEntreParenteses() {

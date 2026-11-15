@@ -171,6 +171,30 @@ class ParserTest {
     }
 
     @Test
+    @DisplayName("break dentro de while vira o nó Break")
+    void breakNoWhile() {
+        assertArvore("while (true) { break; }",
+                "Program",
+                "  While",
+                "    BoolLit true",
+                "    Block",
+                "      Break");
+    }
+
+    @Test
+    void breakSemPontoEVirgula() {
+        assertErro("while (true) { break }", 1, 21, "esperado ';', encontrado '}'");
+    }
+
+    @Test
+    @DisplayName("break fora de laço passa no sintático (o erro é do semântico)")
+    void breakForaDeLacoPassaNoSintatico() {
+        Program p = assertDoesNotThrow(() -> analisar("break;"));
+        assertEquals("Program\n  Break\n", AstPrinter.imprimir(p));
+        assertEquals(new Stmt.Break(1, 1), p.itens().get(0));
+    }
+
+    @Test
     @DisplayName("função com parâmetros, return e chamada recursiva")
     void funcaoComParametros() {
         assertArvore("func f(n: int, x: float): int { return f(n - 1, x); }",

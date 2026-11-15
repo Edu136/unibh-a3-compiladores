@@ -87,6 +87,7 @@ public final class AstPrinter {
                 linha(nivel, "Return");
                 expr(nivel + 1, r.expr());
             }
+            case Stmt.Break b -> linha(nivel, "Break");
             case Stmt.Block b -> {
                 linha(nivel, "Block");
                 for (Stmt s : b.stmts()) {
