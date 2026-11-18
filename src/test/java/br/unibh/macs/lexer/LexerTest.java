@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import br.unibh.macs.erro.CompileError;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -350,5 +352,53 @@ class LexerTest {
     void entradaVazia() {
         assertToken(tokens("").get(0), EOF, "", 1, 1);
         assertEquals(1, tokens("   \n\t ").size());
+    }
+
+    // ---------- modo mineiro (--uai) ----------
+
+    private static List<TokenType> tiposUai(String fonte) {
+        return Lexer.tokenizar(fonte, true).stream().map(Token::type).toList();
+    }
+
+    @Test
+    @DisplayName("L1: com --uai, as 11 palavras mineiras geram os tokens normais")
+    void l1_onzePalavras() {
+        assertEquals(List.of(VAR, FUNC, IF, ELSE, WHILE, FOR, RETURN, PRINT, INPUT, TRUE, FALSE, EOF),
+                tiposUai("trem causo se senao enquantim pra devolve prosa escuta bao nem"));
+    }
+
+    @Test
+    @DisplayName("L2: lexema mineiro, tipo normal, posição certa")
+    void l2_lexemaMineiroTipoNormal() {
+        List<Token> t = Lexer.tokenizar("trem x: int = 1;", true);
+        assertToken(t.get(0), VAR, "trem", 1, 1);
+        assertToken(t.get(1), ID, "x", 1, 6);
+    }
+
+    @Test
+    @DisplayName("L3: sem --uai, as palavras mineiras são identificadores")
+    void l3_semModoSaoId() {
+        List<TokenType> esperado = new ArrayList<>(Collections.nCopies(11, ID));
+        esperado.add(EOF);
+        assertEquals(esperado, tipos("trem causo se senao enquantim pra devolve prosa escuta bao nem"));
+    }
+
+    @Test
+    @DisplayName("L4: com --uai, as palavras normais continuam valendo")
+    void l4_normaisContinuam() {
+        assertEquals(List.of(VAR, ID, PRINT, IF, EOF), tiposUai("var x print if"));
+    }
+
+    @Test
+    @DisplayName("L5: palavra parecida ou com maiúscula não é palavra-chave")
+    void l5_parecidaNaoEPalavraChave() {
+        assertEquals(List.of(ID, ID, ID, EOF), tiposUai("tremzinho prosas Trem"));
+    }
+
+    @Test
+    @DisplayName("L6: bao e nem são literais booleanos")
+    void l6_baoENem() {
+        assertEquals(List.of(VAR, ID, COLON, BOOL, ASSIGN, FALSE, SEMICOLON, EOF),
+                tiposUai("trem b: bool = nem;"));
     }
 }

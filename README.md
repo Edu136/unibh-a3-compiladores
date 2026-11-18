@@ -30,7 +30,7 @@ Gera `target\macsc.jar` e roda os testes. O `build.bat` usa o JDK indicado em `M
 ## Usar
 
 ```bat
-macsc.bat programa.macs [--tokens] [--ast] [--exe]
+macsc.bat programa.macs [--tokens] [--ast] [--exe] [--uai]
 ```
 
 | Opção | Efeito |
@@ -38,13 +38,16 @@ macsc.bat programa.macs [--tokens] [--ast] [--exe]
 | `--tokens` | imprime a lista de tokens (`linha:coluna  TIPO  lexema`) |
 | `--ast` | imprime a árvore sintática anotada com os tipos |
 | `--exe` | além do `.asm`, monta e liga o executável `programa.exe` |
+| `--uai` | modo mineiro: aceita as palavras-chave em mineirês e põe sotaque nas mensagens de erro (veja [Modo mineiro](#modo-mineiro)) |
 
 Se não houver erros, o compilador grava `programa.asm` (NASM, x86 32 bits) na mesma pasta do fonte. Com `--exe`, também gera `programa.exe`:
 
 ```bat
-macsc.bat fatorial.macs --exe
-fatorial.exe
+macsc.bat exemplos\fatorial.macs --exe
+exemplos\fatorial.exe
 ```
+
+O programa do enunciado (fatorial) está em [`exemplos/fatorial.macs`](exemplos/fatorial.macs).
 
 O `macsc.bat` usa o Java indicado em `MACSC_JAVA`, se definido.
 
@@ -60,6 +63,51 @@ Exemplo:
 1:14  INT_LIT  42
 1:16  SEMICOLON  ;
 1:17  EOF
+```
+
+## Modo mineiro
+
+Com `--uai`, o programa pode ser escrito com palavras-chave em mineirês:
+
+```
+trem idade: int = 20;
+se (idade >= 18) {
+    prosa("pode entrar, sô");
+} senao {
+    prosa("ainda não, uai");
+}
+```
+
+```bat
+macsc.bat mineiro.macs --uai --exe
+mineiro.exe
+pode entrar, sô
+```
+
+| Mineirês (`--uai`) | Palavra normal | Token |
+|---|---|---|
+| `trem` | `var` | `VAR` |
+| `causo` | `func` | `FUNC` |
+| `se` | `if` | `IF` |
+| `senao` | `else` | `ELSE` |
+| `enquantim` | `while` | `WHILE` |
+| `pra` | `for` | `FOR` |
+| `devolve` | `return` | `RETURN` |
+| `prosa` | `print` | `PRINT` |
+| `escuta` | `input` | `INPUT` |
+| `bao` | `true` | `TRUE` |
+| `nem` | `false` | `FALSE` |
+
+- Os tipos (`int`, `float`, `char`, `bool`, `string`) não mudam, e as palavras normais continuam valendo.
+- Com `--uai`, as palavras mineiras são reservadas (`var se: int;` é erro). Sem `--uai`, são nomes comuns.
+- Todo erro de compilação ganha o prefixo `uai, sô! `, por exemplo `mineiro.macs:3:29: erro sintático: uai, sô! esperado ';', encontrado '}'`.
+- Só o analisador léxico muda: `trem` gera o mesmo token `VAR` que `var` (com o lexema `trem`), então o parser, o semântico e o gerador não sabem que o programa estava em mineirês.
+
+Um programa completo, usando as 11 palavras, está em [`exemplos/mineiro.macs`](exemplos/mineiro.macs):
+
+```bat
+macsc.bat exemplos\mineiro.macs --uai --exe
+exemplos\mineiro.exe
 ```
 
 ## Análise léxica

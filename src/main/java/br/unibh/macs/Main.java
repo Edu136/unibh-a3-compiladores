@@ -23,14 +23,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens] [--ast]}. */
+/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens] [--ast] [--exe] [--uai]}. */
 public final class Main {
 
     static final int SUCESSO = 0;
     static final int ERRO_COMPILACAO = 1;
     static final int ERRO_USO = 2;
 
-    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe]";
+    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe] [--uai]";
     private static final char BOM = '﻿';
     private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
 
@@ -68,6 +68,7 @@ public final class Main {
         boolean mostrarTokens = false;
         boolean mostrarAst = false;
         boolean gerarExe = false;
+        boolean mineiro = false;
 
         for (String arg : args) {
             if (arg.equals("--tokens")) {
@@ -76,6 +77,8 @@ public final class Main {
                 mostrarAst = true;
             } else if (arg.equals("--exe")) {
                 gerarExe = true;
+            } else if (arg.equals("--uai")) {
+                mineiro = true;
             } else if (arg.startsWith("--")) {
                 err.println("opção desconhecida: " + arg);
                 err.println(USO);
@@ -109,7 +112,7 @@ public final class Main {
         }
 
         try {
-            List<Token> tokens = Lexer.tokenizar(fonte);
+            List<Token> tokens = Lexer.tokenizar(fonte, mineiro);
             if (mostrarTokens) {
                 imprimirTokens(tokens, out);
             }
@@ -117,7 +120,7 @@ public final class Main {
             Resultado semantico = SemanticAnalyzer.analisar(programa);
             if (semantico.temErros()) {
                 for (CompileError erro : semantico.erros()) {
-                    err.println(erro.formatar(arquivo));
+                    err.println(erro.formatar(arquivo, mineiro));
                 }
                 return ERRO_COMPILACAO;
             }
@@ -128,7 +131,7 @@ public final class Main {
             String asm = CodeGenerator.gerar(semantico.programa(), semantico.resolucao());
             return escreverSaidas(caminho, asm, gerarExe, err);
         } catch (CompileError e) {
-            err.println(e.formatar(arquivo));
+            err.println(e.formatar(arquivo, mineiro));
             return ERRO_COMPILACAO;
         } catch (StackOverflowError e) {
             // as fases são recursivas; o estouro pode ocorrer em qualquer uma delas (sem rótulo de fase)

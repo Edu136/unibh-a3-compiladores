@@ -30,7 +30,22 @@ public final class Lexer {
             Map.entry("bool", TokenType.BOOL),
             Map.entry("string", TokenType.STRING));
 
+    /** Palavras-chave do modo mineiro (--uai): valem junto com as normais. */
+    private static final Map<String, TokenType> PALAVRAS_MINEIRAS = Map.ofEntries(
+            Map.entry("trem", TokenType.VAR),
+            Map.entry("causo", TokenType.FUNC),
+            Map.entry("se", TokenType.IF),
+            Map.entry("senao", TokenType.ELSE),
+            Map.entry("enquantim", TokenType.WHILE),
+            Map.entry("pra", TokenType.FOR),
+            Map.entry("devolve", TokenType.RETURN),
+            Map.entry("prosa", TokenType.PRINT),
+            Map.entry("escuta", TokenType.INPUT),
+            Map.entry("bao", TokenType.TRUE),
+            Map.entry("nem", TokenType.FALSE));
+
     private final String fonte;
+    private final boolean mineiro;
     private final List<Token> tokens = new ArrayList<>();
 
     private int pos = 0;      // índice do próximo caractere a ler
@@ -42,12 +57,17 @@ public final class Lexer {
     private int linhaInicio;
     private int colunaInicio;
 
-    private Lexer(String fonte) {
+    private Lexer(String fonte, boolean mineiro) {
         this.fonte = fonte;
+        this.mineiro = mineiro;
     }
 
     public static List<Token> tokenizar(String fonte) {
-        return new Lexer(fonte).executar();
+        return tokenizar(fonte, false);
+    }
+
+    public static List<Token> tokenizar(String fonte, boolean mineiro) {
+        return new Lexer(fonte, mineiro).executar();
     }
 
     private List<Token> executar() {
@@ -130,7 +150,11 @@ public final class Lexer {
             avancar();
         }
         String texto = lexemaAtual();
-        adicionar(PALAVRAS_CHAVE.getOrDefault(texto, TokenType.ID));
+        TokenType tipo = PALAVRAS_CHAVE.get(texto);
+        if (tipo == null && mineiro) {
+            tipo = PALAVRAS_MINEIRAS.get(texto);
+        }
+        adicionar(tipo != null ? tipo : TokenType.ID);
     }
 
     /** INT_LIT = D+ ; FLOAT_LIT = D+ "." D+ (sem sinal: o "-" é operador). */
