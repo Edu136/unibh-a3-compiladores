@@ -1,0 +1,37 @@
+// Exemplo do modo mineiro. Compile com:
+//   macsc.bat exemplos\mineiro.macs --uai --exe
+//   exemplos\mineiro.exe
+
+causo dobro(n: int): int {
+    devolve n * 2;
+}
+
+causo podeEntrar(idade: int): bool {
+    se (idade >= 18) {
+        devolve bao;
+    }
+    devolve nem;
+}
+
+trem idade: int;
+prosa("Quantos anos ocê tem?");
+escuta(idade);
+
+se (podeEntrar(idade)) {
+    prosa("pode entrar, sô");
+} senao {
+    prosa("ainda não, uai");
+}
+prosa("o dobro é " + dobro(idade));
+
+prosa("contando os pão de queijo:");
+pra (trem i: int = 1; i <= 3; i = i + 1) {
+    prosa(i + " pão de queijo");
+}
+
+trem cafe: int = 3;
+enquantim (cafe > 0) {
+    prosa("ainda tem " + cafe + " xícara de café");
+    cafe = cafe - 1;
+}
+prosa("acabou o café, trem bão demais!");

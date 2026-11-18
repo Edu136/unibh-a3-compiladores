@@ -101,6 +101,13 @@ pode entrar, sô
 - Todo erro de compilação ganha o prefixo `uai, sô! `, por exemplo `mineiro.macs:3:29: erro sintático: uai, sô! esperado ';', encontrado '}'`.
 - Só o analisador léxico muda: `trem` gera o mesmo token `VAR` que `var` (com o lexema `trem`), então o parser, o semântico e o gerador não sabem que o programa estava em mineirês.
 
+Um programa completo, usando as 11 palavras, está em [`exemplos/mineiro.macs`](exemplos/mineiro.macs):
+
+```bat
+macsc.bat exemplos\mineiro.macs --uai --exe
+exemplos\mineiro.exe
+```
+
 ## Análise léxica
 
 - Palavras-chave: `var func if else while for return break print input true false int float char bool string`
