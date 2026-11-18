@@ -87,6 +87,7 @@ public final class Parser {
             case WHILE -> cmdWhile();
             case FOR -> cmdFor();
             case RETURN -> cmdReturn();
+            case BREAK -> cmdBreak();
             case LBRACE -> bloco();
             case FUNC -> throw erroNoAtual("função só pode ser declarada no nível global");
             default -> throw esperado("comando");
@@ -144,6 +145,13 @@ public final class Parser {
         return new Stmt.Return(e, r.linha(), r.coluna());
     }
 
+    // cmdBreak = "break" ";" ;
+    private Stmt.Break cmdBreak() {
+        Token b = consumir(BREAK, "'break'");
+        consumirPontoEVirgula();
+        return new Stmt.Break(b.linha(), b.coluna());
+    }
+
     private Expr condicaoEntreParenteses() {
         consumir(LPAREN, "'('");
         Expr cond = expr();
@@ -151,11 +159,47 @@ public final class Parser {
         return cond;
     }
 
-    // atribuicao = ID "=" expr ;
+    // atribuicao = ID ( "=" expr | opComposto expr | "++" | "--" ) ;
+    // opComposto = "+=" | "-=" | "*=" | "/=" | "%=" ;
+    // Os atalhos são traduzidos aqui: x++ vira x = x + 1, e x op= e vira x = x op (e).
     private Stmt.Assign atribuicao() {
         Token nome = consumir(ID, "identificador");
-        consumir(ASSIGN, "'='");
-        return new Stmt.Assign(nome.lexema(), expr(), nome.linha(), nome.coluna());
+        Token op = atual();
+        Expr valor = switch (op.type()) {
+            case ASSIGN -> {
+                avancar();
+                yield expr();
+            }
+            case INC, DEC -> {
+                avancar();
+                BinaryOp bop = op.type() == INC ? BinaryOp.ADD : BinaryOp.SUB;
+                Expr um = new Expr.IntLit(1, op.linha(), op.coluna());
+                yield new Expr.Binary(bop, variavel(nome), um, op.linha(), op.coluna());
+            }
+            case PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN, PERCENT_ASSIGN -> {
+                avancar();
+                // expr() inteiro: é o que dá os "parênteses" de x op= e
+                yield new Expr.Binary(operadorComposto(op.type()), variavel(nome), expr(),
+                        op.linha(), op.coluna());
+            }
+            default -> throw esperado("'='");
+        };
+        return new Stmt.Assign(nome.lexema(), valor, nome.linha(), nome.coluna());
+    }
+
+    /** Um nó Var novo para o nome (o semântico guarda informações por nó, então cada uso tem o seu). */
+    private static Expr.Var variavel(Token nome) {
+        return new Expr.Var(nome.lexema(), nome.linha(), nome.coluna());
+    }
+
+    private static BinaryOp operadorComposto(TokenType tipo) {
+        return switch (tipo) {
+            case PLUS_ASSIGN -> BinaryOp.ADD;
+            case MINUS_ASSIGN -> BinaryOp.SUB;
+            case STAR_ASSIGN -> BinaryOp.MUL;
+            case SLASH_ASSIGN -> BinaryOp.DIV;
+            default -> BinaryOp.MOD; // PERCENT_ASSIGN
+        };
     }
 
     // declVar = "var" ID ":" tipo [ "=" expr ] ;
@@ -168,10 +212,10 @@ public final class Parser {
         return new Stmt.VarDecl(nome.lexema(), tipo, init, var.linha(), var.coluna());
     }
 
-    /** Comando que começa com identificador: chamada se vier "(", atribuição se vier "=". */
+    /** Comando que começa com identificador: chamada se vier "(", atribuição se vier "=" ou um atalho. */
     private Stmt atribuicaoOuChamada() {
         TokenType seguinte = tokens.get(pos + 1).type(); // existe: a lista sempre termina em EOF
-        if (seguinte == ASSIGN) {
+        if (ehAtribuicao(seguinte)) {
             return atribuicao();
         }
         Token nome = avancar();
@@ -180,6 +224,14 @@ public final class Parser {
         }
         Expr.Call call = chamada(nome);
         return new Stmt.CallStmt(call, nome.linha(), nome.coluna());
+    }
+
+    /** Tokens que, logo depois de um identificador, indicam uma atribuição. */
+    private static boolean ehAtribuicao(TokenType tipo) {
+        return switch (tipo) {
+            case ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN, PERCENT_ASSIGN, INC, DEC -> true;
+            default -> false;
+        };
     }
 
     // cmdPrint = "print" "(" expr ")" ";" ;

@@ -69,6 +69,12 @@ class CodeGenE2ETest {
         assertTrue(asm.contains("_SetConsoleOutputCP@4"), asm);
     }
 
+    @Test
+    void asmTemSaltoDoBreak() {
+        String asm = E2E.asm("while (true) { break; }");
+        assertTrue(asm.contains("; break"), asm);
+    }
+
     // ---------- tabelas de cenários (preenchidas nos próximos ciclos) ----------
 
     static Stream<Arguments> casos() {
@@ -164,10 +170,41 @@ class CodeGenE2ETest {
                         + "print(7 / d); print(7 % d);",
                         "-2147483648\n-2147483648\n0\n-7\n0\n"),
 
+                // ---- atalhos de atribuição (STORY-005) ----
+                caso("var x: int = 5; x++; print(x); x--; x--; print(x);", "6\n4\n"),
+                caso("var x: int = 10; x += 5; print(x); x -= 3; print(x); x *= 2; print(x); "
+                        + "x /= 4; print(x); x %= 4; print(x);",
+                        "15\n12\n24\n6\n2\n"),
+                caso("var x: int = 10; x -= 3 - 1; print(x); x *= 2 + 1; print(x);", "8\n24\n"),
+                caso("for (var i: int = 0; i < 3; i++) { print(i); }", "0\n1\n2\n"),
+                caso("for (var i: int = 3; i > 0; i--) { print(i); }", "3\n2\n1\n"),
+                caso("var f: float = 1.5; f++; print(f); f *= 2; print(f);", "2.500000\n5.000000\n"),
+                caso("var s: string = \"ab\"; s += \"c\"; s += 1; print(s);", "abc1\n"),
+                caso("func soma(n: int): int { var s: int = 0; for (var i: int = 1; i <= n; i++) { s += i; } "
+                        + "return s; } print(soma(4));", "10\n"),
+                caso("var x: int = 7; var z: int = 0; x /= z;", "",
+                        "erro de execução: divisão por zero (linha 1)\n", 1),
+
                 // ---- entrada com BOM (pipe do PowerShell 5.1 envia EF BB BF antes do texto) ----
                 caso("var n: int; input(n); print(n); var s: string; input(s); print(s);",
                         "﻿42\nolá\n", "42\nolá\n", 0),
-                caso("var s: string; input(s); print(s);", "﻿São Paulo\n", "São Paulo\n", 0));
+                caso("var s: string; input(s); print(s);", "﻿São Paulo\n", "São Paulo\n", 0),
+
+                // ---- break (STORY-008) ----
+                caso("var n: int = 0; while (true) { n = n + 1; if (n * n > 50) { break; } } print(n);", "8\n"),
+                caso("for (var i: int = 0; i < 10; i = i + 1) { if (i == 4) { break; } print(i); }",
+                        "0\n1\n2\n3\n"),
+                // o break também pula o passo do for: i e k ficam em 0
+                caso("var k: int = 9; for (var i: int = 0; i < 5; i = i + 1) { k = i; break; } print(k);", "0\n"),
+                // laços aninhados: o break interno não pode sair do for externo
+                caso("for (var i: int = 0; i < 3; i = i + 1) { while (true) { break; } print(i); }", "0\n1\n2\n"),
+                caso("for (var i: int = 0; i < 3; i = i + 1) { for (var j: int = 0; j < 3; j = j + 1) "
+                        + "{ if (j == 1) { break; } print(i * 10 + j); } }",
+                        "0\n10\n20\n"),
+                caso("func raiz(n: int): int { var r: int = 0; while (true) { if ((r + 1) * (r + 1) > n) { break; } "
+                        + "r = r + 1; } return r; } print(raiz(50));", "7\n"),
+                caso("var i: int = 0; while (i < 100) { i = i + 1; if (i == 3) { break; } } print(\"parou em \" + i);",
+                        "parou em 3\n"));
     }
 
     @ParameterizedTest(name = "{0}")

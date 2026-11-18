@@ -12,6 +12,26 @@ import java.util.Map;
 public final class Lexer {
 
     private static final Map<String, TokenType> PALAVRAS_CHAVE = Map.ofEntries(
+            Map.entry("var", TokenType.VAR),
+            Map.entry("func", TokenType.FUNC),
+            Map.entry("if", TokenType.IF),
+            Map.entry("else", TokenType.ELSE),
+            Map.entry("while", TokenType.WHILE),
+            Map.entry("for", TokenType.FOR),
+            Map.entry("return", TokenType.RETURN),
+            Map.entry("break", TokenType.BREAK),
+            Map.entry("print", TokenType.PRINT),
+            Map.entry("input", TokenType.INPUT),
+            Map.entry("true", TokenType.TRUE),
+            Map.entry("false", TokenType.FALSE),
+            Map.entry("int", TokenType.INT),
+            Map.entry("float", TokenType.FLOAT),
+            Map.entry("char", TokenType.CHAR),
+            Map.entry("bool", TokenType.BOOL),
+            Map.entry("string", TokenType.STRING));
+
+    /** Palavras-chave do modo mineiro (--uai): valem junto com as normais. */
+    private static final Map<String, TokenType> PALAVRAS_MINEIRAS = Map.ofEntries(
             Map.entry("trem", TokenType.VAR),
             Map.entry("causo", TokenType.FUNC),
             Map.entry("se", TokenType.IF),
@@ -22,7 +42,7 @@ public final class Lexer {
             Map.entry("prosa", TokenType.PRINT),
             Map.entry("escuta", TokenType.INPUT),
             Map.entry("bao", TokenType.TRUE),
-            Map.entry("nem", TokenType.FALSE);
+            Map.entry("nem", TokenType.FALSE));
 
     private final String fonte;
     private final boolean mineiro;
@@ -63,7 +83,7 @@ public final class Lexer {
         return tokens;
     }
 
-    //--- leitura de tokens -----
+    // ---------- leitura de tokens ----------
 
     private void lerToken() {
         char c = avancar();
@@ -129,12 +149,12 @@ public final class Lexer {
         while (!fim() && (ehLetra(atual()) || ehDigito(atual()))) {
             avancar();
         }
-                String texto = lexemaAtual();
+        String texto = lexemaAtual();
         TokenType tipo = PALAVRAS_CHAVE.get(texto);
         if (tipo == null && mineiro) {
             tipo = PALAVRAS_MINEIRAS.get(texto);
         }
-        adicionar(tipo != null ? tipo : TokenType.ID); 
+        adicionar(tipo != null ? tipo : TokenType.ID);
     }
 
     /** INT_LIT = D+ ; FLOAT_LIT = D+ "." D+ (sem sinal: o "-" é operador). */

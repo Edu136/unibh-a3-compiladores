@@ -64,11 +64,12 @@ Exemplo:
 
 ## Análise léxica
 
-- Palavras-chave: `var func if else while for return print input true false int float char bool string`
+- Palavras-chave: `var func if else while for return break print input true false int float char bool string`
 - Identificadores: `[A-Za-z_][A-Za-z0-9_]*` (sem acentos)
 - Literais: inteiros (`42`, até 2147483647), reais (`3.14`, com dígitos dos dois lados do ponto), caracteres (`'a'`) e strings (`"texto"`, sem quebra de linha)
 - Escapes em char e string: `\n \t \\ \" \' \0`
-- Operadores: `+ - * / % = == != < <= > >= && || !` e pontuação `( ) { } , ; :`
+- Operadores: `+ - * / % = == != < <= > >= && || !`, atalhos de atribuição `++ -- += -= *= /= %=` e pontuação `( ) { } , ; :`
+- Vale o maior casamento: `++`, `--` e `+=` são um token só. Por isso `5--3` é erro; para subtrair um negativo, escreva `5 - -3` ou `5 - (-3)`.
 - Comentários: `// linha` e `/* bloco */`
 - O código-fonte é lido em UTF-8 (com ou sem BOM), ou em Windows-1252 se não for UTF-8 válido. O analisador para no primeiro erro.
 
@@ -83,15 +84,17 @@ parametro  = ID ":" tipo ;
 tipo       = "int" | "float" | "char" | "bool" | "string" ;
 bloco      = "{" { comando } "}" ;
 comando    = declVar ";" | atribuicao ";" | chamada ";" | cmdPrint | cmdInput
-           | cmdIf | cmdWhile | cmdFor | cmdReturn | bloco ;
+           | cmdIf | cmdWhile | cmdFor | cmdReturn | cmdBreak | bloco ;
 declVar    = "var" ID ":" tipo [ "=" expr ] ;
-atribuicao = ID "=" expr ;
+atribuicao = ID ( "=" expr | opComposto expr | "++" | "--" ) ;
+opComposto = "+=" | "-=" | "*=" | "/=" | "%=" ;
 cmdPrint   = "print" "(" expr ")" ";" ;
 cmdInput   = "input" "(" ID ")" ";" ;
 cmdIf      = "if" "(" expr ")" bloco [ "else" ( bloco | cmdIf ) ] ;
 cmdWhile   = "while" "(" expr ")" bloco ;
 cmdFor     = "for" "(" [ declVar | atribuicao ] ";" [ expr ] ";" [ atribuicao ] ")" bloco ;
 cmdReturn  = "return" expr ";" ;
+cmdBreak   = "break" ";" ;
 expr       = ou ;
 ou         = e { "||" e } ;
 e          = igualdade { "&&" igualdade } ;
@@ -105,6 +108,8 @@ primaria   = INT_LIT | FLOAT_LIT | CHAR_LIT | STRING_LIT | "true" | "false"
 chamada    = ID "(" [ expr { "," expr } ] ")" ;
 ```
 
+- Os atalhos são traduzidos no sintático: `x++` vira `x = x + 1` e `x op= e` vira `x = x op (e)`; o semântico e o gerador não mudam.
+- Os atalhos são comandos, não expressões: `++x`, `y = x++;` e `print(x++);` são erro.
 - Comparações não podem ser encadeadas (`a < b < c` é erro; use `a < b && b < c`).
 - Funções só podem ser declaradas no nível global; comandos também podem ficar fora de funções.
 - Erros indicam o que era esperado e o que foi encontrado, por exemplo `prog.macs:3:15: erro sintático: esperado ';', encontrado 'print'`.
@@ -134,7 +139,8 @@ Verifica escopos e tipos, anota o tipo de cada expressão e insere as conversõe
 
 - Atribuição, inicialização, argumentos e `return` aceitam o mesmo tipo ou int → float. float → int é erro.
 - Condições de `if`, `while` e `for` precisam ser `bool`. `input` não aceita variável `bool`.
-- Toda função precisa terminar em `return` em todos os caminhos (um `if` só garante retorno se tiver `else` e os dois lados retornarem).
+- `break` só pode aparecer dentro de um `while` ou `for` e sai só do laço mais interno. Fora de laço, produz o erro semântico `break fora de laço`, e o `.asm` não é gerado.
+- Toda função precisa terminar em `return` em todos os caminhos (um `if` só garante retorno se tiver `else` e os dois lados retornarem). `while` e `for` não garantem retorno, e `break` também não conta como `return`.
 - Variáveis sem valor inicial começam com `0`, `0.0`, `'\0'`, `false` ou `""`.
 
 Exemplo de `--ast` (árvore anotada):
@@ -184,6 +190,7 @@ Gera assembly NASM x86 (32 bits) para Windows, ligado com a biblioteca C do Wind
 - `print` imprime o valor e pula linha. Float sai com 6 casas (`2.500000`).
 - `input` lê do teclado. Para string, lê a linha inteira, com espaços e acentos. Para char, lê um caractere ASCII. Se a leitura falhar, a variável fica com o valor padrão.
 - `&&` e `||` só avaliam o lado direito quando é preciso.
+- `break` salta para o rótulo de fim do laço mais interno. O gerador mantém os rótulos de fim dos laços abertos numa pilha, e o `break` usa o do topo. No `for`, o salto também pula o passo da iteração.
 - `/` e `%` entre inteiros seguem C e Java: truncam em direção a zero, e o resto tem o sinal do dividendo. Divisão ou resto por zero interrompe o programa com `erro de execução: divisão por zero (linha L)` e código 1.
 - Inteiros têm 32 bits e estouram em silêncio, como em C e Java: `2147483647 + 1` dá `-2147483648`.
 

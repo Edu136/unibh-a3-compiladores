@@ -40,6 +40,7 @@ public final class SemanticAnalyzer {
     private FuncSymbol funcaoAtual = null; // null = código global
     private int proximoSlotGlobal = 0;
     private int proximoSlotLocal = 0;
+    private int lacosAbertos = 0; // quantos while/for envolvem o comando atual
 
     private SemanticAnalyzer() {
     }
@@ -87,6 +88,7 @@ public final class SemanticAnalyzer {
     private FuncDecl funcao(FuncDecl f) {
         funcaoAtual = simboloDaDeclaracao.get(f);
         proximoSlotLocal = 0;
+        lacosAbertos = 0;
         tabela.entrarFuncao(); // parâmetros e corpo no mesmo escopo; o global fica invisível
 
         for (FuncDecl.Param p : f.params()) {
@@ -143,19 +145,33 @@ public final class SemanticAnalyzer {
             }
             case Stmt.If i -> new Stmt.If(condicao(i.cond(), "if"), bloco(i.entao()),
                     i.senao() == null ? null : stmt(i.senao()), i.linha(), i.coluna());
-            case Stmt.While w -> new Stmt.While(condicao(w.cond(), "while"), bloco(w.corpo()), w.linha(), w.coluna());
+            case Stmt.While w -> {
+                Expr cond = condicao(w.cond(), "while");
+                lacosAbertos++;
+                Stmt.Block corpo = bloco(w.corpo());
+                lacosAbertos--;
+                yield new Stmt.While(cond, corpo, w.linha(), w.coluna());
+            }
             case Stmt.For f -> {
                 tabela.abrir(); // a variável do init vale no cabeçalho e no corpo
                 Stmt init = f.init() == null ? null : stmt(f.init());
                 Expr cond = f.cond() == null ? null : condicao(f.cond(), "for");
                 Stmt.Assign passo = f.passo() == null ? null : atribuicao(f.passo());
+                lacosAbertos++;
                 Stmt.Block corpo = bloco(f.corpo());
+                lacosAbertos--;
                 tabela.fechar();
                 yield new Stmt.For(init, cond, passo, corpo, f.linha(), f.coluna());
             }
             case Stmt.Block b -> bloco(b);
             case Stmt.CallStmt c -> new Stmt.CallStmt(chamada(c.call()), c.linha(), c.coluna());
             case Stmt.Return r -> retorno(r);
+            case Stmt.Break b -> {
+                if (lacosAbertos == 0) {
+                    erro(b.linha(), b.coluna(), "break fora de laço");
+                }
+                yield b;
+            }
         };
     }
 
@@ -407,6 +423,11 @@ public final class SemanticAnalyzer {
     }
 
     private void erro(int linha, int coluna, String mensagem) {
+        for (CompileError e : erros) {
+            if (e.getLinha() == linha && e.getColuna() == coluna && e.getMessage().equals(mensagem)) {
+                return; // mesmo erro, mesma posição (ex.: x++ com x não declarada procura x duas vezes)
+            }
+        }
         erros.add(new CompileError(CompileError.Fase.SEMANTICO, linha, coluna, mensagem));
     }
 }
