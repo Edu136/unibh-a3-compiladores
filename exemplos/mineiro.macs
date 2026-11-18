@@ -25,13 +25,13 @@ se (podeEntrar(idade)) {
 prosa("o dobro é " + dobro(idade));
 
 prosa("contando os pão de queijo:");
-pra (trem i: int = 1; i <= 3; i = i + 1) {
+pra (trem i: int = 1; i <= 3; i++) {
     prosa(i + " pão de queijo");
 }
 
 trem cafe: int = 3;
 enquantim (cafe > 0) {
     prosa("ainda tem " + cafe + " xícara de café");
-    cafe = cafe - 1;
+    cafe--;
 }
 prosa("acabou o café, trem bão demais!");
