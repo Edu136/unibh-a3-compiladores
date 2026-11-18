@@ -12,24 +12,20 @@ import java.util.Map;
 public final class Lexer {
 
     private static final Map<String, TokenType> PALAVRAS_CHAVE = Map.ofEntries(
-            Map.entry("var", TokenType.VAR),
-            Map.entry("func", TokenType.FUNC),
-            Map.entry("if", TokenType.IF),
-            Map.entry("else", TokenType.ELSE),
-            Map.entry("while", TokenType.WHILE),
-            Map.entry("for", TokenType.FOR),
-            Map.entry("return", TokenType.RETURN),
-            Map.entry("print", TokenType.PRINT),
-            Map.entry("input", TokenType.INPUT),
-            Map.entry("true", TokenType.TRUE),
-            Map.entry("false", TokenType.FALSE),
-            Map.entry("int", TokenType.INT),
-            Map.entry("float", TokenType.FLOAT),
-            Map.entry("char", TokenType.CHAR),
-            Map.entry("bool", TokenType.BOOL),
-            Map.entry("string", TokenType.STRING));
+            Map.entry("trem", TokenType.VAR),
+            Map.entry("causo", TokenType.FUNC),
+            Map.entry("se", TokenType.IF),
+            Map.entry("senao", TokenType.ELSE),
+            Map.entry("enquantim", TokenType.WHILE),
+            Map.entry("pra", TokenType.FOR),
+            Map.entry("devolve", TokenType.RETURN),
+            Map.entry("prosa", TokenType.PRINT),
+            Map.entry("escuta", TokenType.INPUT),
+            Map.entry("bao", TokenType.TRUE),
+            Map.entry("nem", TokenType.FALSE);
 
     private final String fonte;
+    private final boolean mineiro;
     private final List<Token> tokens = new ArrayList<>();
 
     private int pos = 0;      // índice do próximo caractere a ler
@@ -41,12 +37,17 @@ public final class Lexer {
     private int linhaInicio;
     private int colunaInicio;
 
-    private Lexer(String fonte) {
+    private Lexer(String fonte, boolean mineiro) {
         this.fonte = fonte;
+        this.mineiro = mineiro;
     }
 
     public static List<Token> tokenizar(String fonte) {
-        return new Lexer(fonte).executar();
+        return tokenizar(fonte, false);
+    }
+
+    public static List<Token> tokenizar(String fonte, boolean mineiro) {
+        return new Lexer(fonte, mineiro).executar();
     }
 
     private List<Token> executar() {
@@ -62,7 +63,7 @@ public final class Lexer {
         return tokens;
     }
 
-    // ---------- leitura de tokens ----------
+    //--- leitura de tokens -----
 
     private void lerToken() {
         char c = avancar();
@@ -74,11 +75,28 @@ public final class Lexer {
             switch (c) {
                 case '"' -> lerString();
                 case '\'' -> lerChar();
-                case '+' -> adicionar(TokenType.PLUS);
-                case '-' -> adicionar(TokenType.MINUS);
-                case '*' -> adicionar(TokenType.STAR);
-                case '/' -> adicionar(TokenType.SLASH); // comentários já foram pulados
-                case '%' -> adicionar(TokenType.PERCENT);
+                case '+' -> {
+                    if (seguidoDe('+')) {
+                        adicionar(TokenType.INC);
+                    } else if (seguidoDe('=')) {
+                        adicionar(TokenType.PLUS_ASSIGN);
+                    } else {
+                        adicionar(TokenType.PLUS);
+                    }
+                }
+                case '-' -> {
+                    if (seguidoDe('-')) {
+                        adicionar(TokenType.DEC);
+                    } else if (seguidoDe('=')) {
+                        adicionar(TokenType.MINUS_ASSIGN);
+                    } else {
+                        adicionar(TokenType.MINUS);
+                    }
+                }
+                case '*' -> adicionar(seguidoDe('=') ? TokenType.STAR_ASSIGN : TokenType.STAR);
+                // comentários já foram pulados
+                case '/' -> adicionar(seguidoDe('=') ? TokenType.SLASH_ASSIGN : TokenType.SLASH);
+                case '%' -> adicionar(seguidoDe('=') ? TokenType.PERCENT_ASSIGN : TokenType.PERCENT);
                 case '(' -> adicionar(TokenType.LPAREN);
                 case ')' -> adicionar(TokenType.RPAREN);
                 case '{' -> adicionar(TokenType.LBRACE);
@@ -111,8 +129,12 @@ public final class Lexer {
         while (!fim() && (ehLetra(atual()) || ehDigito(atual()))) {
             avancar();
         }
-        String texto = lexemaAtual();
-        adicionar(PALAVRAS_CHAVE.getOrDefault(texto, TokenType.ID));
+                String texto = lexemaAtual();
+        TokenType tipo = PALAVRAS_CHAVE.get(texto);
+        if (tipo == null && mineiro) {
+            tipo = PALAVRAS_MINEIRAS.get(texto);
+        }
+        adicionar(tipo != null ? tipo : TokenType.ID); 
     }
 
     /** INT_LIT = D+ ; FLOAT_LIT = D+ "." D+ (sem sinal: o "-" é operador). */
