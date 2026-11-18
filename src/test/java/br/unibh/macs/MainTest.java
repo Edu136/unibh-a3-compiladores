@@ -276,4 +276,47 @@ class MainTest {
         assertEquals(0, executar(arquivo("bom.macs", comBom), "--tokens"));
         assertTrue(out().startsWith("1:1  VAR  var"), out());
     }
+    @Test void m1_tokensMostraLexemaMineiro() {
+    assertEquals(0, executar(arquivo("trem x: int = 42;"), "--uai", "--tokens"));
+    String[] l = out().split("\\R");
+    assertEquals("1:1  VAR  trem", l[0]);
+    assertEquals("1:6  ID  x", l[1]);
+}
+
+    @Test void m2_astIgualAoNormal() {
+    assertEquals(0, executar(arquivo("trem x: int = 1; prosa(x);"), "--uai", "--ast"));
+    assertTrue(out().contains("VarDecl x: int"));
+    assertTrue(out().contains("Print"));
+}
+
+// m3: copie exeRoda() (com assumeTrue) e use o programa:
+// "trem n: int = 3; pra (trem i: int = 1; i <= n; i = i + 1) { prosa(i); }" com --uai --exe
+// esperado: código 0 e o .exe imprime 1, 2 e 3, um por linha.
+
+    @Test void m4_erroSintaticoComSotaque() {
+    assertEquals(1, executar(arquivo("prosa(1)"), "--uai"));
+    assertTrue(err().contains(":1:9: erro sintático: uai, sô! esperado ';', encontrado fim do arquivo"));
+}
+
+    @Test void m5_erroSemanticoComSotaque() {
+    assertEquals(1, executar(arquivo("prosa(x);"), "--uai"));
+    assertTrue(err().contains(":1:7: erro semântico: uai, sô! variável 'x' não declarada"));
+}
+
+    @Test void m6_erroLexicoComSotaque() {
+    assertEquals(1, executar(arquivo("prosa(1 @ 2);"), "--uai"));
+    assertTrue(err().contains(":1:9: erro léxico: uai, sô! caractere inesperado '@'"));
+}
+
+    @Test void m7_semUaiMineiresEErroComum() {
+    assertEquals(1, executar(arquivo("trem x: int = 1;")));
+    assertTrue(err().contains(":1:6: erro sintático: esperado '=' ou '(' após identificador, encontrado identificador 'x'"));
+    assertFalse(err().contains("uai"));
+}
+
+    @Test void m8_palavraMineiraEReservada() {
+    assertEquals(1, executar(arquivo("var se: int = 1;"), "--uai"));
+    assertTrue(err().contains(":1:5: erro sintático: uai, sô! esperado identificador, encontrado 'se'"));
+    assertEquals(0, executar(arquivo("var se: int = 1;")));
+}
 }
