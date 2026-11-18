@@ -43,9 +43,11 @@ macsc.bat programa.macs [--tokens] [--ast] [--exe] [--uai]
 Se não houver erros, o compilador grava `programa.asm` (NASM, x86 32 bits) na mesma pasta do fonte. Com `--exe`, também gera `programa.exe`:
 
 ```bat
-macsc.bat fatorial.macs --exe
-fatorial.exe
+macsc.bat exemplos\fatorial.macs --exe
+exemplos\fatorial.exe
 ```
+
+O programa do enunciado (fatorial) está em [`exemplos/fatorial.macs`](exemplos/fatorial.macs).
 
 O `macsc.bat` usa o Java indicado em `MACSC_JAVA`, se definido.
 

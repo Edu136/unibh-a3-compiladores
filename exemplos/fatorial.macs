@@ -1,0 +1,14 @@
+func fatorial(n: int): int {
+    var resultado: int = 1;
+    for (var i: int = 1; i <= n; i = i + 1) {
+        resultado = resultado * i;
+    }
+    return resultado;
+}
+
+print("Digite um número para calcular o fatorial:");
+var numero: int;
+input(numero);
+
+var fat: int = fatorial(numero);
+print("O fatorial de " + numero + " é " + fat);
