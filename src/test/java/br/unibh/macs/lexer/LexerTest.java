@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import br.unibh.macs.erro.CompileError;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +76,13 @@ class LexerTest {
         assertEquals(List.of(ID, ID, ID, ID, ID, EOF), t.stream().map(Token::type).toList());
         assertEquals(List.of("x", "_tmp", "contador2", "ifx", "Var"),
                 t.subList(0, 5).stream().map(Token::lexema).toList());
+    }
+
+    @Test
+    @DisplayName("break é palavra-chave; breakpoint continua identificador")
+    void palavraChaveBreak() {
+        assertEquals(List.of(BREAK, ID, EOF), tipos("break breakpoint"));
+        assertEquals(List.of(BREAK, SEMICOLON, EOF), tipos("break;"));
     }
 
     // ---------- literais ----------
@@ -186,6 +195,56 @@ class LexerTest {
     }
 
     @Test
+    @DisplayName("atalhos de atribuição: os 7 tokens novos")
+    void atalhosDeAtribuicao() {
+        assertEquals(
+                List.of(INC, DEC, PLUS_ASSIGN, MINUS_ASSIGN, STAR_ASSIGN, SLASH_ASSIGN, PERCENT_ASSIGN, EOF),
+                tipos("++ -- += -= *= /= %="));
+    }
+
+    @Test
+    @DisplayName("atalhos guardam lexema e posição")
+    void atalhosLexemaEPosicao() {
+        List<Token> t = tokens("x++;");
+        assertEquals(4, t.size());
+        assertToken(t.get(0), ID, "x", 1, 1);
+        assertToken(t.get(1), INC, "++", 1, 2);
+        assertToken(t.get(2), SEMICOLON, ";", 1, 4);
+        assertToken(t.get(3), EOF, "", 1, 5);
+
+        assertToken(tokens("total -= 2;").get(1), MINUS_ASSIGN, "-=", 1, 7);
+    }
+
+    @Test
+    @DisplayName("atalho colado ao nome ou separado por espaço dá os mesmos tokens")
+    void atalhoColadoOuSeparado() {
+        assertEquals(List.of(ID, INC, SEMICOLON, EOF), tipos("teste ++;"));
+        assertEquals(List.of(ID, INC, SEMICOLON, EOF), tipos("teste++;"));
+    }
+
+    @Test
+    @DisplayName("maior casamento com os atalhos")
+    void maiorCasamentoDosAtalhos() {
+        assertEquals(List.of(ID, INC, PLUS, ID, EOF), tipos("a+++b"));
+        assertEquals(List.of(ID, PLUS, PLUS, ID, EOF), tipos("a + +b"));
+        assertEquals(List.of(ID, ASSIGN, MINUS, INT_LIT, EOF), tipos("x=-1"));
+    }
+
+    @Test
+    @DisplayName("'--' colado é um token só; com espaço são dois menos")
+    void doisMenosColados() {
+        assertEquals(List.of(INT_LIT, DEC, INT_LIT, EOF), tipos("5--3"));
+        assertEquals(List.of(INT_LIT, MINUS, MINUS, INT_LIT, EOF), tipos("5 - -3"));
+    }
+
+    @Test
+    @DisplayName("'/=' é atalho, mas '//=' continua sendo comentário")
+    void barraIgualVersusComentario() {
+        assertEquals(List.of(ID, SLASH_ASSIGN, INT_LIT, EOF), tipos("x /= 2"));
+        assertEquals(List.of(ID, EOF), tipos("x //= 2"));
+    }
+
+    @Test
     void ecomercialIsolado() {
         assertErro("a & b", 1, 3, "'&' isolado: esperado '&&'");
     }
@@ -294,4 +353,38 @@ class LexerTest {
         assertToken(tokens("").get(0), EOF, "", 1, 1);
         assertEquals(1, tokens("   \n\t ").size());
     }
+
+    private static List<TokenType> tiposUai(String fonte) {
+    return Lexer.tokenizar(fonte, true).stream().map(Token::type).toList();
+}
+
+@Test void l1_onzePalavras() {
+    assertEquals(List.of(VAR, FUNC, IF, ELSE, WHILE, FOR, RETURN, PRINT, INPUT, TRUE, FALSE, EOF),
+            tiposUai("trem causo se senao enquantim pra devolve prosa escuta bao nem"));
+}
+
+@Test void l2_lexemaMineiroTipoNormal() {
+    List<Token> t = Lexer.tokenizar("trem x: int = 1;", true);
+    assertToken(t.get(0), TokenType.VAR, "trem", 1, 1);
+    assertToken(t.get(1), TokenType.ID, "x", 1, 6);
+}
+
+@Test void l3_semModoSaoId() {
+    List<TokenType> esperado = new ArrayList<>(Collections.nCopies(11, TokenType.ID));
+    esperado.add(TokenType.EOF);
+    assertEquals(esperado, tipos("trem causo se senao enquantim pra devolve prosa escuta bao nem"));
+}
+
+@Test void l4_normaisContinuam() {
+    assertEquals(List.of(VAR, ID, PRINT, IF, EOF), tiposUai("var x print if"));
+}
+
+@Test void l5_parecidaNaoEPalavraChave() {
+    assertEquals(List.of(ID, ID, ID, EOF), tiposUai("tremzinho prosas Trem"));
+}
+
+@Test void l6_baoENem() {
+    assertEquals(List.of(VAR, ID, COLON, BOOL, ASSIGN, FALSE, SEMICOLON, EOF),
+            tiposUai("trem b: bool = nem;"));
+}
 }
