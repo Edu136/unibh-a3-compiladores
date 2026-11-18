@@ -43,7 +43,6 @@ public class CompileError extends RuntimeException {
     }
 
     /** Formata como {@code arquivo:linha:coluna: erro <fase>: mensagem}. */
-        /** Formata como {@code arquivo:linha:coluna: erro <fase>: mensagem}. */
     public String formatar(String arquivo) {
         return formatar(arquivo, false);
     }

@@ -23,14 +23,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens] [--ast]}. */
+/** Ponto de entrada do compilador: {@code macsc <arquivo.macs> [--tokens] [--ast] [--exe] [--uai]}. */
 public final class Main {
 
     static final int SUCESSO = 0;
     static final int ERRO_COMPILACAO = 1;
     static final int ERRO_USO = 2;
 
-    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe]";
+    private static final String USO = "uso: macsc <arquivo.macs> [--tokens] [--ast] [--exe] [--uai]";
     private static final char BOM = '﻿';
     private static final Charset WINDOWS_1252 = Charset.forName("windows-1252");
 
@@ -65,7 +65,9 @@ public final class Main {
     /** Executa o compilador e devolve o código de saída (sem chamar System.exit). */
     static int run(String[] args, PrintStream out, PrintStream err) {
         String arquivo = null;
-               boolean gerarExe = false;
+        boolean mostrarTokens = false;
+        boolean mostrarAst = false;
+        boolean gerarExe = false;
         boolean mineiro = false;
 
         for (String arg : args) {
@@ -78,6 +80,11 @@ public final class Main {
             } else if (arg.equals("--uai")) {
                 mineiro = true;
             } else if (arg.startsWith("--")) {
+                err.println("opção desconhecida: " + arg);
+                err.println(USO);
+                return ERRO_USO;
+            } else if (arquivo == null) {
+                arquivo = arg;
             } else {
                 err.println(USO);
                 return ERRO_USO;
