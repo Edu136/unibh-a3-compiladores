@@ -43,7 +43,14 @@ public class CompileError extends RuntimeException {
     }
 
     /** Formata como {@code arquivo:linha:coluna: erro <fase>: mensagem}. */
+        /** Formata como {@code arquivo:linha:coluna: erro <fase>: mensagem}. */
     public String formatar(String arquivo) {
-        return arquivo + ":" + linha + ":" + coluna + ": erro " + fase.descricao() + ": " + getMessage();
+        return formatar(arquivo, false);
+    }
+
+    /** Com mineiro = true, a mensagem ganha o prefixo "uai, sô! " (modo --uai). */
+    public String formatar(String arquivo, boolean mineiro) {
+        String prefixo = mineiro ? "uai, sô! " : "";
+        return arquivo + ":" + linha + ":" + coluna + ": erro " + fase.descricao() + ": " + prefixo + getMessage();
     }
 }
