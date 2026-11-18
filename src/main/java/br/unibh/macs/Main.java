@@ -65,9 +65,8 @@ public final class Main {
     /** Executa o compilador e devolve o código de saída (sem chamar System.exit). */
     static int run(String[] args, PrintStream out, PrintStream err) {
         String arquivo = null;
-        boolean mostrarTokens = false;
-        boolean mostrarAst = false;
-        boolean gerarExe = false;
+               boolean gerarExe = false;
+        boolean mineiro = false;
 
         for (String arg : args) {
             if (arg.equals("--tokens")) {
@@ -76,12 +75,9 @@ public final class Main {
                 mostrarAst = true;
             } else if (arg.equals("--exe")) {
                 gerarExe = true;
+            } else if (arg.equals("--uai")) {
+                mineiro = true;
             } else if (arg.startsWith("--")) {
-                err.println("opção desconhecida: " + arg);
-                err.println(USO);
-                return ERRO_USO;
-            } else if (arquivo == null) {
-                arquivo = arg;
             } else {
                 err.println(USO);
                 return ERRO_USO;
@@ -109,7 +105,7 @@ public final class Main {
         }
 
         try {
-            List<Token> tokens = Lexer.tokenizar(fonte);
+            List<Token> tokens = Lexer.tokenizar(fonte, mineiro);
             if (mostrarTokens) {
                 imprimirTokens(tokens, out);
             }
@@ -117,7 +113,7 @@ public final class Main {
             Resultado semantico = SemanticAnalyzer.analisar(programa);
             if (semantico.temErros()) {
                 for (CompileError erro : semantico.erros()) {
-                    err.println(erro.formatar(arquivo));
+                    err.println(erro.formatar(arquivo, mineiro));
                 }
                 return ERRO_COMPILACAO;
             }
@@ -128,7 +124,7 @@ public final class Main {
             String asm = CodeGenerator.gerar(semantico.programa(), semantico.resolucao());
             return escreverSaidas(caminho, asm, gerarExe, err);
         } catch (CompileError e) {
-            err.println(e.formatar(arquivo));
+            err.println(e.formatar(arquivo, mineiro));
             return ERRO_COMPILACAO;
         } catch (StackOverflowError e) {
             // as fases são recursivas; o estouro pode ocorrer em qualquer uma delas (sem rótulo de fase)
